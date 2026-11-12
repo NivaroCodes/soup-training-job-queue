@@ -1,0 +1,522 @@
+{
+  "run_id": "perf_read_heavy_100rps_20261112_110017_9b041c",
+  "git_revision": "90758d713c3a906a7cbff0f79e6249f4d072e43a",
+  "started_at": "2026-11-12T11:00:17.844998+00:00",
+  "ended_at": "2026-11-12T11:05:32.399471+00:00",
+  "config": {
+    "scenario": "read_heavy",
+    "target_rps": 100.0,
+    "duration_seconds": 300.0,
+    "warmup_seconds": 10.0,
+    "concurrency": 64,
+    "seed": 42,
+    "window_seconds": 60.0
+  },
+  "http": {
+    "total_requests": 30000,
+    "measured_seconds": 300.08,
+    "achieved_rps": 99.97,
+    "p50_ms": 23.435,
+    "p95_ms": 46.121,
+    "p99_ms": 67.45,
+    "max_ms": 266.012,
+    "status_2xx": 30000,
+    "status_4xx": 0,
+    "status_5xx": 0,
+    "connection_errors": 0,
+    "timeouts": 0,
+    "error_samples": [],
+    "per_endpoint": {
+      "GET /jobs": {
+        "count": 14965,
+        "p50_ms": 28.271,
+        "p95_ms": 53.609,
+        "p99_ms": 74.752,
+        "max_ms": 266.012,
+        "status_2xx": 14965,
+        "status_4xx": 0,
+        "status_5xx": 0,
+        "errors": 0
+      },
+      "GET /jobs/{id}": {
+        "count": 15035,
+        "p50_ms": 13.896,
+        "p95_ms": 31.011,
+        "p99_ms": 49.516,
+        "max_ms": 221.639,
+        "status_2xx": 15035,
+        "status_4xx": 0,
+        "status_5xx": 0,
+        "errors": 0
+      }
+    }
+  },
+  "postgres": {
+    "samples": 306,
+    "max_active_conns": 5,
+    "max_total_conns": 28,
+    "max_lock_waits": 0,
+    "max_active_query_ms": 17.48
+  },
+  "workers_and_correctness": {
+    "job_counts": {
+      "succeeded": 50
+    },
+    "submitted_unique_measured": 0,
+    "persisted_unique_measured": 0,
+    "avg_queue_wait_ms": 28.17,
+    "duplicate_effects": 0,
+    "inconsistent_states": 0
+  },
+  "container_health": {
+    "soup-training-job-queue-api-1": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-postgres-1": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-1": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-2": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-3": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-4": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-5": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-6": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-7": {
+      "running": true,
+      "restarts_during_run": 0
+    },
+    "soup-training-job-queue-worker-8": {
+      "running": true,
+      "restarts_during_run": 0
+    }
+  },
+  "docker_stats_snapshot": [
+    {
+      "container": "soup-training-job-queue-api-1",
+      "cpu": "1.41%",
+      "mem": "292.3MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-3",
+      "cpu": "1.19%",
+      "mem": "48.36MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-2",
+      "cpu": "1.29%",
+      "mem": "48.66MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-7",
+      "cpu": "1.21%",
+      "mem": "48.68MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-1",
+      "cpu": "1.25%",
+      "mem": "48.65MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-8",
+      "cpu": "1.42%",
+      "mem": "48.65MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-5",
+      "cpu": "1.13%",
+      "mem": "48.69MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-6",
+      "cpu": "1.20%",
+      "mem": "48.67MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-4",
+      "cpu": "1.22%",
+      "mem": "48.66MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-postgres-1",
+      "cpu": "12.35%",
+      "mem": "226.3MiB / 7.571GiB"
+    }
+  ],
+  "timeseries": [
+    {
+      "window": 1,
+      "timestamp": "2026-11-12T11:01:21.665908+00:00",
+      "achieved_rps": 81.9,
+      "requests": 4914,
+      "errors": 0,
+      "p50_ms": 23.619,
+      "p95_ms": 46.605,
+      "p99_ms": 65.681,
+      "max_ms": 94.086,
+      "pg": {
+        "total_conns": 27,
+        "active_conns": 0,
+        "lock_waits": 0
+      },
+      "queue_counts": {
+        "succeeded": 50
+      },
+      "docker_stats": [
+        {
+          "container": "soup-training-job-queue-api-1",
+          "cpu": "73.94%",
+          "mem": "292MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-3",
+          "cpu": "1.17%",
+          "mem": "48.36MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-2",
+          "cpu": "1.08%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-7",
+          "cpu": "0.84%",
+          "mem": "48.68MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-1",
+          "cpu": "0.94%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-8",
+          "cpu": "0.85%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-5",
+          "cpu": "0.92%",
+          "mem": "48.69MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-6",
+          "cpu": "0.84%",
+          "mem": "48.67MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-4",
+          "cpu": "0.81%",
+          "mem": "48.66MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-postgres-1",
+          "cpu": "68.73%",
+          "mem": "226.9MiB / 7.571GiB"
+        }
+      ]
+    },
+    {
+      "window": 2,
+      "timestamp": "2026-11-12T11:02:23.931391+00:00",
+      "achieved_rps": 103.82,
+      "requests": 6229,
+      "errors": 0,
+      "p50_ms": 23.655,
+      "p95_ms": 46.899,
+      "p99_ms": 70.773,
+      "max_ms": 166.723,
+      "pg": {
+        "total_conns": 27,
+        "active_conns": 1,
+        "lock_waits": 0
+      },
+      "queue_counts": {
+        "succeeded": 50
+      },
+      "docker_stats": [
+        {
+          "container": "soup-training-job-queue-api-1",
+          "cpu": "98.37%",
+          "mem": "301.9MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-3",
+          "cpu": "0.86%",
+          "mem": "48.37MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-2",
+          "cpu": "1.39%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-7",
+          "cpu": "0.88%",
+          "mem": "48.69MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-1",
+          "cpu": "1.14%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-8",
+          "cpu": "1.09%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-5",
+          "cpu": "1.03%",
+          "mem": "48.69MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-6",
+          "cpu": "1.10%",
+          "mem": "48.67MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-4",
+          "cpu": "0.99%",
+          "mem": "48.66MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-postgres-1",
+          "cpu": "73.29%",
+          "mem": "227MiB / 7.571GiB"
+        }
+      ]
+    },
+    {
+      "window": 3,
+      "timestamp": "2026-11-12T11:03:26.189273+00:00",
+      "achieved_rps": 103.78,
+      "requests": 6227,
+      "errors": 0,
+      "p50_ms": 23.736,
+      "p95_ms": 48.019,
+      "p99_ms": 69.827,
+      "max_ms": 182.971,
+      "pg": {
+        "total_conns": 27,
+        "active_conns": 1,
+        "lock_waits": 0
+      },
+      "queue_counts": {
+        "succeeded": 50
+      },
+      "docker_stats": [
+        {
+          "container": "soup-training-job-queue-api-1",
+          "cpu": "67.00%",
+          "mem": "293.2MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-3",
+          "cpu": "0.79%",
+          "mem": "48.36MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-2",
+          "cpu": "0.88%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-7",
+          "cpu": "0.81%",
+          "mem": "48.69MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-1",
+          "cpu": "0.98%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-8",
+          "cpu": "0.82%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-5",
+          "cpu": "0.87%",
+          "mem": "48.69MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-6",
+          "cpu": "0.84%",
+          "mem": "48.67MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-4",
+          "cpu": "0.80%",
+          "mem": "48.66MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-postgres-1",
+          "cpu": "74.88%",
+          "mem": "226MiB / 7.571GiB"
+        }
+      ]
+    },
+    {
+      "window": 4,
+      "timestamp": "2026-11-12T11:04:27.599616+00:00",
+      "achieved_rps": 103.72,
+      "requests": 6223,
+      "errors": 0,
+      "p50_ms": 22.997,
+      "p95_ms": 46.175,
+      "p99_ms": 66.532,
+      "max_ms": 150.175,
+      "pg": {
+        "total_conns": 27,
+        "active_conns": 1,
+        "lock_waits": 0
+      },
+      "queue_counts": {
+        "succeeded": 50
+      },
+      "docker_stats": [
+        {
+          "container": "soup-training-job-queue-api-1",
+          "cpu": "100.18%",
+          "mem": "292.4MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-3",
+          "cpu": "0.71%",
+          "mem": "48.36MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-2",
+          "cpu": "0.89%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-7",
+          "cpu": "0.74%",
+          "mem": "48.68MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-1",
+          "cpu": "0.77%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-8",
+          "cpu": "0.66%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-5",
+          "cpu": "0.71%",
+          "mem": "48.69MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-6",
+          "cpu": "0.68%",
+          "mem": "48.67MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-4",
+          "cpu": "0.71%",
+          "mem": "48.66MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-postgres-1",
+          "cpu": "63.19%",
+          "mem": "225.6MiB / 7.571GiB"
+        }
+      ]
+    },
+    {
+      "window": 5,
+      "timestamp": "2026-11-12T11:05:29.682489+00:00",
+      "achieved_rps": 102.38,
+      "requests": 6143,
+      "errors": 0,
+      "p50_ms": 23.205,
+      "p95_ms": 43.087,
+      "p99_ms": 64.526,
+      "max_ms": 266.012,
+      "pg": {
+        "total_conns": 27,
+        "active_conns": 1,
+        "lock_waits": 0
+      },
+      "queue_counts": {
+        "succeeded": 50
+      },
+      "docker_stats": [
+        {
+          "container": "soup-training-job-queue-api-1",
+          "cpu": "93.69%",
+          "mem": "293.1MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-3",
+          "cpu": "0.87%",
+          "mem": "48.36MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-2",
+          "cpu": "0.73%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-7",
+          "cpu": "0.85%",
+          "mem": "48.68MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-1",
+          "cpu": "0.76%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-8",
+          "cpu": "0.87%",
+          "mem": "48.65MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-5",
+          "cpu": "0.84%",
+          "mem": "48.69MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-6",
+          "cpu": "0.66%",
+          "mem": "48.67MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-worker-4",
+          "cpu": "0.75%",
+          "mem": "48.66MiB / 7.571GiB"
+        },
+        {
+          "container": "soup-training-job-queue-postgres-1",
+          "cpu": "76.28%",
+          "mem": "226.2MiB / 7.571GiB"
+        }
+      ]
+    }
+  ]
+}

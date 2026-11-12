@@ -1,0 +1,96 @@
+{
+  "run_id": "perf_mixed_100rps_20261112_103127_e4ae2f",
+  "git_revision": "90758d713c3a906a7cbff0f79e6249f4d072e43a",
+  "started_at": "2026-11-12T10:31:27.397821+00:00",
+  "ended_at": "2026-11-12T10:31:48.093972+00:00",
+  "config": {
+    "scenario": "mixed",
+    "target_rps": 100.0,
+    "duration_seconds": 15.0,
+    "warmup_seconds": 3.0,
+    "concurrency": 64,
+    "seed": 42
+  },
+  "http": {
+    "total_requests": 1500,
+    "measured_seconds": 15.001,
+    "achieved_rps": 99.99,
+    "p50_ms": 11.688,
+    "p95_ms": 23.725,
+    "p99_ms": 72.558,
+    "max_ms": 116.063,
+    "status_2xx": 1500,
+    "status_4xx": 0,
+    "status_5xx": 0,
+    "connection_errors": 0,
+    "timeouts": 0,
+    "error_samples": []
+  },
+  "postgres": {
+    "samples": 39,
+    "max_active_conns": 3,
+    "max_total_conns": 23,
+    "max_lock_waits": 0,
+    "max_active_query_ms": 2.6
+  },
+  "workers_and_correctness": {
+    "job_counts": {
+      "succeeded": 744
+    },
+    "avg_queue_wait_ms": 45.46,
+    "duplicate_effects": 0,
+    "inconsistent_states": 0
+  },
+  "docker_stats_snapshot": [
+    {
+      "container": "soup-training-job-queue-api-1",
+      "cpu": "27.57%",
+      "mem": "81.18MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-2",
+      "cpu": "0.94%",
+      "mem": "48.6MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-8",
+      "cpu": "1.05%",
+      "mem": "48.68MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-7",
+      "cpu": "0.86%",
+      "mem": "48.62MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-3",
+      "cpu": "0.90%",
+      "mem": "48.62MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-6",
+      "cpu": "0.87%",
+      "mem": "48.58MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-4",
+      "cpu": "0.94%",
+      "mem": "48.67MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-5",
+      "cpu": "0.84%",
+      "mem": "48.66MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-worker-1",
+      "cpu": "0.92%",
+      "mem": "48.67MiB / 7.571GiB"
+    },
+    {
+      "container": "soup-training-job-queue-postgres-1",
+      "cpu": "8.56%",
+      "mem": "111.1MiB / 7.571GiB"
+    }
+  ]
+}

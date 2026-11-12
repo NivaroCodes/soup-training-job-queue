@@ -1,0 +1,89 @@
+{
+  "run_id": "run_20261112_100147_seed42_442bd4",
+  "seed": 42,
+  "started_at": "2026-11-12T10:01:47.004261+00:00",
+  "ended_at": "2026-11-12T10:01:57.577356+00:00",
+  "duration_seconds": 10.573,
+  "config": {
+    "jobs": 500,
+    "workers": 8,
+    "kill_interval": 2.0,
+    "no_chaos": false,
+    "duplicate_rate": 0.15,
+    "cancel_rate": 0.1,
+    "conflict_probes": 20,
+    "concurrency": 32,
+    "job_steps": 2,
+    "step_duration_ms": 15.0,
+    "max_attempts": 5,
+    "drain_timeout": 300.0
+  },
+  "worker_containers_observed": [
+    "d7a067acc4f13d3f78cdbd7bc715452624ddc0764035f882ca143da12121e8b8",
+    "40b0e55e5d5584c3d2449de6cddb54570dfba364a2341781aed55e0d2eeebf80",
+    "3e93af4b6583d4457b058e5c6cdac031cf4c6cef9e9b7af9602d86c13c2abbc3",
+    "fc7afbaf44c1cfe9ba8db7cb72347731ecb9b84a1f09521064930936f9655edc",
+    "82e3b525c801b2f7b970c58ac0d2614296a2328a61f453366bac6d0e33f320ba",
+    "04683f1378951cf7bcf7f4af095b4b12a7239357e7b0ac1297d629c3d5e179b8",
+    "7e6d646863e10b553309a19d061f921a5d38baa21458fb68e1ab4efb5796872b",
+    "5563b27173288a548fc39fa62ac5d138581d615600ed141323877b27fb0a29c6"
+  ],
+  "submitted_jobs": 500,
+  "duplicate_requests_sent": 75,
+  "duplicate_id_mismatches": 0,
+  "conflict_409_probes": 20,
+  "conflict_409_failures": 0,
+  "cancel_requests_sent": 50,
+  "http_errors": [],
+  "kill_events": [
+    {
+      "timestamp": "2026-11-12T10:01:51.117339+00:00",
+      "container_id": "fc7afbaf44c1",
+      "returncode": 0
+    }
+  ],
+  "restart_events": [
+    {
+      "timestamp": "2026-11-12T10:01:57.540183+00:00",
+      "container_id": "fc7afbaf44c1",
+      "restarted": true
+    }
+  ],
+  "final_state_counts": {
+    "succeeded": 500
+  },
+  "execution_effects_count": 500,
+  "invariants": [
+    {
+      "name": "no_lost_jobs",
+      "passed": true,
+      "details": "db_jobs=500, expected=500, http_errors=0"
+    },
+    {
+      "name": "no_duplicate_side_effects",
+      "passed": true,
+      "details": "duplicate_effect_jobs=0"
+    },
+    {
+      "name": "no_stuck_running_or_queued_jobs",
+      "passed": true,
+      "details": "running=0, queued=0"
+    },
+    {
+      "name": "consistent_final_states",
+      "passed": true,
+      "details": "succeeded=500, effects=500, succeeded_missing_effect=0, non_succeeded_with_effect=0, succeeded_with_cancel=0"
+    },
+    {
+      "name": "fencing_integrity",
+      "passed": true,
+      "details": "fencing_mismatches=0"
+    },
+    {
+      "name": "idempotency_and_409_conflict",
+      "passed": true,
+      "details": "duplicates=75, mismatches=0, 409_probes=20, 409_failures=0"
+    }
+  ],
+  "overall_passed": true
+}

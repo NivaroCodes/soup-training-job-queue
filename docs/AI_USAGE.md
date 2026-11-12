@@ -1,6 +1,6 @@
 # AI Usage Record
 
-> **Status:** Architecture Reviews #1–#3 applied across `docs/DESIGN.md`, `docs/ARCHITECTURE.md`, and `docs/AI_USAGE.md` (documentation only; awaiting final human approval). Application code implementation, database migrations, and automated tests have **not** started.
+> **Status:** Sustained 100 RPS evidence reconciled (`AGY-013`). All `AGY-012` job counts (`40,813` mixed = `50 seed + 4,813 warm-up + 35,950 measured`; `31,000` unique = `1,000 warm-up + 30,000 measured`; `50` read-heavy seed) and telemetry windows (`W1`–`W16`) are verified against PostgreSQL and raw artifacts. Verdict: **`SHIP at 100 RPS`**.
 
 This document records AI assistance used in `soup-training-job-queue`, clearly distinguishing **completed** activities from **planned** activities.
 
@@ -11,8 +11,8 @@ This document records AI assistance used in `soup-training-job-queue`, clearly d
 | Tool | Role | Status |
 | :--- | :--- | :--- |
 | **ChatGPT** | Initial assignment analysis, architecture discussion, repository structure planning, and Python environment setup guidance | Completed (initial setup & planning) |
-| **Antigravity** | Engineering documentation authoring (`AGY-000`) and post-review specification updates (`AGY-001`–`AGY-004`); selected as AI coding agent for upcoming implementation | Documentation phase active (awaiting final human approval); **application code implementation not yet started** |
-| **Developer (Manual)** | PowerShell execution, Python 3.12 / `uv` / dependency verification, Architecture Reviews #1–#3, and final decision approval | Ongoing |
+| **Antigravity** | Engineering documentation (`AGY-000`–`AGY-004`), database (`AGY-005`), REST API (`AGY-006`), worker engine (`AGY-007`), Docker Compose + chaos (`AGY-008`), audit (`AGY-009`), 100 RPS baseline & opt (`AGY-010`–`AGY-011`), and sustained stability (`AGY-012`) | `150,000` sustained 100 RPS requests verified (`SHIP at 100 RPS`) |
+| **Developer (Manual)** | PowerShell execution, Python 3.12 / `uv` setup, `.env` credential entry, Architecture Reviews #1–#3, and starting Docker Desktop + executing Runs A–C | Ongoing |
 
 ---
 
@@ -259,17 +259,198 @@ Use a repeatable entry template for future Antigravity interactions:
 - **Verification:** Documentation-only inspection and `git status -s`; no application code, dependencies, migrations, tests, commits, or pushes were executed.
 - **Evidence:** Updated `docs/DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/AI_USAGE.md`, and `git status -s`.
 
+#### `AGY-005` — Database Foundation Implementation (Models, Config, Alembic, Tests)
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-005`
+- **Objective:** Implement the database foundation (`Job` and `ExecutionEffect` SQLAlchemy 2.x models, constraints and PostgreSQL indexes, environment-backed DB configuration, Alembic setup with initial reversible migration, and PostgreSQL integration tests) without implementing API endpoints, workers, or Docker Compose.
+- **Prompt:** Database foundation implementation task (`# Task: Implement Database Foundation` — `app/` SQLAlchemy models/config/session, Alembic initial migration, PostgreSQL tests, and `AI_USAGE.md` update).
+- **AI Output:**
+  - Created `app/__init__.py`, `app/core/__init__.py`, `app/core/config.py` (environment-backed `Settings`, `postgresql+psycopg://` normalization, SQLite rejection, no hardcoded credentials).
+  - Created `app/db/__init__.py`, `app/db/base.py`, `app/db/models.py` (`JobStatus`, `Job`, `ExecutionEffect`, `finished_at` hybrid property reconciling `completed_at`/`cancelled_at`, check/unique/FK constraints, partial polling & lease recovery indexes), and `app/db/session.py` (synchronous SQLAlchemy 2.x engine/session factory).
+  - Created `.env.example`, `alembic.ini`, `alembic/env.py`, `alembic/script.py.mako`, and `alembic/versions/0001_initial_schema.py` (reversible initial migration).
+  - Created `tests/__init__.py`, `tests/conftest.py`, and `tests/test_database_models.py` (23 test cases requiring PostgreSQL via `TEST_DATABASE_URL` or `DATABASE_URL`; fails explicitly rather than falling back to SQLite).
+- **Decision (Accepted / Modified / Rejected):**
+  - Reconciled `Job` terminal timestamps (`completed_at`, `cancelled_at` from `ARCHITECTURE.md`) with the prompt's `finished_at` by keeping `completed_at` and `cancelled_at` as database columns and exposing `finished_at` as a SQLAlchemy `@hybrid_property` (`coalesce(completed_at, cancelled_at)`).
+  - Added `updated_at` column on `jobs` per task requirements; kept `cancel_requested_at` and `last_error` per `ARCHITECTURE.md`.
+  - Used `ondelete="RESTRICT"` on `execution_effects.job_id` FK to prevent deleting jobs that have committed side effects.
+  - Caught and fixed a double-prefix constraint-naming issue in `0001_initial_schema.py` (`ck_jobs_ck_jobs_*` -> `ck_jobs_*`) discovered via `alembic upgrade head --sql`.
+  - Pending human review.
+- **Human Review:** Pending.
+- **Verification:**
+  - `.venv\Scripts\alembic.exe upgrade head --sql` -> exited `0`; verified exact PostgreSQL DDL and constraint names.
+  - `.venv\Scripts\alembic.exe downgrade 0001_initial_schema:base --sql` -> exited `0`; verified reversible `DROP TABLE` / `DROP INDEX` DDL.
+  - `.venv\Scripts\python.exe -c "..."` (`Base.metadata.create_all` via `create_mock_engine('postgresql+psycopg://')`) -> exited `0`; confirmed 1:1 DDL parity with `0001_initial_schema.py`.
+  - `.venv\Scripts\pytest.exe --collect-only -q` -> exited `0`; 23 tests collected.
+  - `.venv\Scripts\pytest.exe -v` -> exited `1`; 1 passed (`test_config_rejects_sqlite_and_missing_database_url`), 22 errored at `postgres_url` fixture setup (`Failed: TEST_DATABASE_URL or DATABASE_URL must be set to a PostgreSQL database; SQLite fallback is disallowed.`).
+- **Evidence:** Offline DDL output, mock-engine DDL output, and `pytest -v` output (`1 passed, 22 errors in 0.27s`).
+
+#### `AGY-006` — REST API Implementation
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-006`
+- **Objective:** Implement the FastAPI REST API (`POST /jobs`, `GET /jobs/{job_id}`, `GET /jobs`, `POST /jobs/{job_id}/cancel`) using the existing PostgreSQL + SQLAlchemy 2.x foundation, separating routes, schemas, business logic, and repository operations, and verify with PostgreSQL integration tests (without implementing workers or Docker Compose).
+- **Prompt:** REST API implementation task (`AGY-006 — REST API Implementation`).
+- **AI Output:**
+  - Created `app/schemas/__init__.py` and `app/schemas/jobs.py` (`JobCreateRequest`, `ExecutionEffectResponse`, `JobResponse`, `JobListResponse`).
+  - Created `app/repositories/__init__.py` and `app/repositories/job_repository.py` (`JobRepository` with `get_by_id`, `get_by_idempotency_key`, `create`, `list_jobs`, `cancel_queued_job`, `request_running_job_cancellation`).
+  - Created `app/services/__init__.py` and `app/services/job_service.py` (`compute_request_hash`, `JobService` with concurrent-safe idempotency handling via `uq_jobs_idempotency_key` + `IntegrityError` rollback/re-read, and bounded-retry cancellation race handling).
+  - Created `app/api/__init__.py`, `app/api/dependencies.py`, `app/api/routes/__init__.py`, `app/api/routes/jobs.py`, and `app/main.py`.
+  - Updated `tests/conftest.py` (added `client` fixture with per-request PostgreSQL sessions) and created `tests/test_api_jobs.py` (13 API integration tests including `ThreadPoolExecutor` concurrent idempotency tests).
+- **Decision (Accepted / Modified / Rejected):**
+  - Accepted both `Idempotency-Key` header and `idempotency_key` JSON body field (requiring at least one, rejecting blank/mismatched values with `422`), returning `201 Created` on initial creation, `200 OK` on idempotent replay, and `409 Conflict` on payload/parameter mismatch.
+  - Kept database schema and Alembic migrations unchanged; updated `updated_at = clock_timestamp()` in raw SQL cancellation updates.
+  - Pending human review.
+- **Human Review:** Pending.
+- **Verification:**
+  - `.venv\Scripts\pytest.exe -v` -> exited `0`; **`36 passed, 5 warnings in 2.40s`** against live PostgreSQL (`23` database foundation tests + `13` REST API integration tests).
+- **Evidence:** `pytest -v` output (`36 passed, 5 warnings in 2.40s`).
+
+#### `AGY-007` — Worker Engine, Leases, Fencing and Recovery
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-007`
+- **Objective:** Implement independent PostgreSQL-backed worker processes (`>= 4` runnable simultaneously), background lease heartbeats with a dedicated DB session, monotonic fencing and lease-validity enforcement, deterministic `ExecutionEffect` atomic commits, cooperative cancellation checkpoints, retryable/non-retryable failure handling, and dead-worker lease recovery, verified with PostgreSQL integration tests.
+- **Prompt:** Worker engine implementation task (`# AGY-007 — Worker Engine, Leases, Fencing and Recovery`).
+- **AI Output:**
+  - Updated `app/core/config.py` with worker polling, lease TTL, heartbeat interval, and recovery settings.
+  - Created `app/repositories/worker_repository.py` (`ClaimedJob`, `RecoveryStats`, `WorkerRepository` with `claim_next_job`, `renew_heartbeat`, `complete_job_atomically`, `complete_cooperative_cancellation`, `handle_retryable_failure`, `fail_job_non_retryable`, and `recover_expired_jobs`).
+  - Created `app/worker/__init__.py`, `app/worker/heartbeat.py` (`LeaseHeartbeat` daemon thread with dedicated PostgreSQL session), `app/worker/executor.py` (`SimulatedJobExecutor` and failure/cancellation exceptions), `app/worker/runner.py` (`WorkerRunner`, `generate_worker_id`), and `app/worker/__main__.py` (`python -m app.worker` CLI entrypoint).
+  - Created `tests/test_worker_engine.py` (12 PostgreSQL integration tests covering multi-worker claiming, no double claim, fencing token increments, blocking-execution heartbeat, expired lease rejection, zombie worker rejection, atomic `ExecutionEffect` + completion, no duplicate effects, cooperative cancellation, retryable failure precedence, non-retryable failure precedence, dead-worker recovery, and recovery vs. completion race serialization).
+- **Decision (Accepted / Modified / Rejected):**
+  - Used `make_interval(secs => :lease_ttl)` with `clock_timestamp()` in PostgreSQL queries for authoritative lease math.
+  - Kept `DESIGN.md` and `ARCHITECTURE.md` unchanged (implementation followed the approved design without deviation).
+  - Pending human review.
+- **Human Review:** Pending.
+- **Verification:**
+  - `.venv\Scripts\python.exe -m app.worker --help` -> exited `0`.
+  - `.venv\Scripts\pytest.exe -v` -> exited `0`; **`48 passed, 5 warnings in 2.81s`** against live PostgreSQL (`13` API tests + `23` DB/Alembic tests + `12` worker/lease/fencing/recovery tests).
+- **Evidence:** `python -m app.worker --help` output and `pytest -v` output (`48 passed, 5 warnings in 2.81s`).
+
+#### `AGY-008` — Docker Compose, Multi-Process Execution and Chaos Harness
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-008`
+- **Objective:** Implement Docker Compose orchestration (`postgres`, `migrate`, `api`, `>= 4` independent `worker` containers), a reproducible `SIGKILL` chaos harness with direct PostgreSQL invariant checks (`artifacts/chaos/`), and silent-failure documentation (`docs/CHAOS_REPORT.md`), then run smoke, chaos, and `pytest` verification.
+- **Prompt:** Docker Compose and chaos harness task (`# AGY-008 — Docker Compose, Multi-Process Execution and Chaos Harness`).
+- **AI Output:**
+  - Created `.dockerignore`, `Dockerfile` (Python 3.12 + `uv sync --frozen --no-dev`), and `docker-compose.yml` (`postgres:16-alpine` with `pg_data` volume & healthcheck, one-shot `migrate`, `api` with healthcheck, `worker` with `deploy.replicas: 4` and scalable via `--scale worker=8`, using `COMPOSE_POSTGRES_PORT=5433` on host to avoid colliding with local PostgreSQL on `5432`).
+  - Created `scripts/chaos_harness.py` (configurable jobs/workers/seed/kill-interval, concurrent duplicate idempotency requests, `409` conflict probes, concurrent cancellations, `SIGKILL` + restart loop, PostgreSQL invariant verifier, unique non-overwriting `.log` and `.json` outputs in `artifacts/chaos/`).
+  - Created `docs/CHAOS_REPORT.md` documenting methodology, silent-failure verification matrix, and harness limitations.
+- **Decision (Accepted / Modified / Rejected):**
+  - Left `docs/DESIGN.md` and `docs/ARCHITECTURE.md` unchanged (no design deviation required).
+  - Pending human review and live Docker execution.
+- **Human Review:** Pending.
+- **Verification:**
+  - `docker compose config --quiet` -> exited `0` (valid Compose configuration).
+  - `.venv\Scripts\python.exe scripts/chaos_harness.py --help` -> exited `0`.
+  - `docker info --format '{{.ServerVersion}}'` -> exited `1` (`//./pipe/dockerDesktopLinuxEngine` not found; Docker Desktop daemon not running, blocking live `docker compose up` and chaos runs).
+  - `.venv\Scripts\pytest.exe -v` -> exited `0`; **`48 passed, 5 warnings in 3.84s`** against local PostgreSQL.
+- **Evidence:** `docker compose config --quiet`, `scripts/chaos_harness.py --help`, `docker info` error output, and `pytest -v` (`48 passed, 5 warnings in 3.84s`).
+
+#### `AGY-009` — Evidence Documentation, AI Usage Audit & Take-Home Compliance
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-009`
+- **Objective:** Audit all implementation files, `pytest` results, and `artifacts/chaos/` outputs (`run_20261112_095909_seed42_55d8b3`, `run_20261112_100147_seed42_442bd4`, `run_20261112_100304_seed42_9b42c4`), update `docs/CHAOS_REPORT.md` and `docs/AI_USAGE.md` with evidence-backed findings, add an AI reliability assessment, and produce the 26-item take-home requirement coverage matrix.
+- **Prompt:** Evidence documentation, AI usage audit, and take-home compliance task (`# AGY-009`).
+- **AI Output:** Rewrote `docs/CHAOS_REPORT.md` (14 required sections, 6-invariant table, `DON'T SHIP at 100 RPS yet` verdict) and updated `docs/AI_USAGE.md` with stage audit table, preserved failure history, AI reliability assessment, and 26-item coverage matrix.
+- **Decision (Accepted / Modified / Rejected):** Pending human review.
+- **Human Review:** Pending.
+- **Verification:** Inspected all `.json` and `.log` artifacts in `artifacts/chaos/`, ran `git diff --check`, `git status -s`, and `.venv\Scripts\pytest.exe -v`.
+- **Evidence:** `artifacts/chaos/*.json`, `artifacts/chaos/*.log`, `docs/CHAOS_REPORT.md`, `git diff --check`, and `pytest -v`.
+
+#### `AGY-010` — Performance Baseline & 100 RPS Validation
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-010`
+- **Objective:** Audit the unmodified architecture and query plans, define a reproducible 25/50/100 RPS load testing methodology, run baseline benchmarks across all 5 API operations and a mixed workload against Docker Compose, identify the first bottleneck from measured telemetry, and document findings in `docs/PERFORMANCE_REPORT.md` (stopping before Phase 6 optimization).
+- **Prompt:** Performance baseline & 100 RPS validation task (`# AGY-010`).
+- **AI Output:**
+  - Created `scripts/load_test.py` (rate-paced `ThreadPoolExecutor` + `httpx` client, warm-up + measured phases, `pg_stat_activity` sampler, `docker stats` snapshot, non-destructive `perf_<run_id>:` key scoping, immutable `.json` and `.log` outputs in `artifacts/perf/`).
+  - Executed `19` baseline runs (`10 RPS` mixed + `25/50/100 RPS` across `post_unique`, `post_duplicate`, `get_job`, `get_list`, `post_cancel`, and `mixed`) without modifying application code.
+  - Created `docs/PERFORMANCE_REPORT.md` documenting query plans, all `19` baseline runs, bottleneck isolation (`api-1` single-process Uvicorn + redundant `JobService.create_job()` post-commit `SELECT`), proposed Phase 6 optimizations (not yet applied), and verdict **`DON'T SHIP at 100 RPS`**.
+- **Decision (Accepted / Modified / Rejected):**
+  - Proposed Phase 6 optimizations (removing redundant post-commit `SELECT` in `JobService.create_job()`, scaling Uvicorn `--workers 4`) documented for human review; **no optimization code applied yet**.
+- **Human Review:** Pending.
+- **Verification:**
+  - Inspected `EXPLAIN` plans on `10,000`-row `jobs` table and `SHOW max_connections` (`100`).
+  - Executed `19` runs via `scripts/load_test.py` against live Docker Compose (`artifacts/perf/`).
+- **Evidence:** `artifacts/perf/*.json`, `artifacts/perf/*.log`, `docs/PERFORMANCE_REPORT.md`.
+
+#### `AGY-011` — Targeted Performance Optimization (Optimization A & B)
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-011`
+- **Objective:** Remove the redundant post-commit `SELECT` in `JobService.create_job()` (Optimization A) and scale Uvicorn to `4` worker processes with bounded DB pools (Optimization B), benchmarking each stage independently and verifying zero correctness regressions.
+- **Prompt:** Targeted performance optimization task (`# AGY-011`).
+- **AI Output:**
+  - Updated `app/services/job_service.py` (Optimization A: replaced `get_by_id` after `commit()` with `set_committed_value(job, "execution_effect", None)`) and added `test_create_job_unique_triggers_no_post_commit_select_or_lazy_load` in `tests/test_api_jobs.py`.
+  - Updated `docker-compose.yml` (Optimization B: `--workers 4` on `api`, `API` pool `5+5=10` per worker = `40` max, `Worker` pool `3+2=5` per container = `40` max; `80 < 100 max_connections`).
+  - Executed `4` Opt A runs and `4` Opt A+B runs (`artifacts/perf/`), preserving all `19` baseline artifacts.
+  - Updated `docs/PERFORMANCE_REPORT.md` and `docs/AI_USAGE.md`.
+- **Decision (Accepted / Modified / Rejected):** Pending final review.
+- **Human Review:** Pending.
+- **Verification:**
+  - `.venv\Scripts\pytest.exe -v` -> **`49 passed, 5 warnings in 2.75s`**.
+  - Opt A (`100 RPS` `post_unique`): `98.89 RPS`, `p50=10.36 ms`, `p99=175.70 ms`.
+  - Opt A+B (`100 RPS` `post_unique`): **`99.97 RPS`**, `p50=10.69 ms`, **`p99=21.36 ms`**; `mixed` (`100 RPS`): **`99.98 RPS`**, `p50=11.16 ms`, **`p99=23.35 ms`**.
+- **Evidence:** `artifacts/perf/*.json`, `artifacts/perf/*.log`, `docs/PERFORMANCE_REPORT.md`, `pytest -v`.
+
+#### `AGY-012` — Sustained Load and Stability Validation
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-012`
+- **Objective:** Validate sustained 100 RPS stability without modifying application code or DB config: `15 min` mixed (`+2 min` warm-up), `5 min` unique `POST /jobs`, and `5 min` read-heavy (`GET /jobs/{id}` + `GET /jobs`), with windowed telemetry and post-run correctness checks.
+- **Prompt:** Sustained load and stability validation task (`# AGY-012`).
+- **AI Output:**
+  - Extended `scripts/load_test.py` (test harness only) with `--scenario read_heavy`, per-endpoint latency/status breakdown, 60s `timeseries` window sampling, `unique_sub` vs `persisted_unique_measured` verification, and container `RestartCount` tracking.
+  - Executed `3` sustained 100 RPS runs (`150,000` measured requests total) and updated `docs/PERFORMANCE_REPORT.md` and `docs/AI_USAGE.md`.
+- **Decision (Accepted / Modified / Rejected):** Pending final review.
+- **Human Review:** Pending.
+- **Verification:**
+  - `15 min` mixed (`perf_mixed_100rps_20261112_103730_1d7d1d`): `99.97 RPS`, `p50=15.38 ms`, `p95=33.82 ms`, `p99=47.82 ms`, `90,000` `2xx`, `0` errors, `35,950/35,950` unique persisted, `40,813` succeeded, `0` dup effects, `0` inconsistent, `pg_max_conns=28/100`, `0` restarts.
+  - `5 min` unique POST (`perf_post_unique_100rps_20261112_105450_db4a2b`): `99.98 RPS`, `p50=13.82 ms`, `p95=24.21 ms`, `p99=31.71 ms`, `30,000/30,000` persisted, `31,000` succeeded, `0` errors, `0` restarts.
+  - `5 min` read-heavy (`perf_read_heavy_100rps_20261112_110017_9b041c`): `99.97 RPS`, `p50=23.44 ms`, `p95=46.12 ms`, `p99=67.45 ms`, `30,000` `2xx`, `0` errors, `0` restarts.
+- **Evidence:** `artifacts/perf/perf_*_100rps_20261112_1037*.{json,log}`, `1054*.{json,log}`, `1100*.{json,log}`, `docs/PERFORMANCE_REPORT.md`.
+
+#### `AGY-013` — Sustained Load Evidence Reconciliation
+- **Date:** `2026-11-12`
+- **Task ID:** `AGY-013`
+- **Objective:** Independently reconcile all `AGY-012` job counts, warm-up activity, database state counts, and telemetry windows against raw `.json`/`.log` artifacts and live PostgreSQL without modifying application code or database state.
+- **Prompt:** Sustained load evidence reconciliation task (`# AGY-013`).
+- **AI Output:**
+  - Inspected all three `AGY-012` `.log` and `.json` files and queried PostgreSQL by `idempotency_key` prefix (`seed:`, `wu:`, `u:`).
+  - Reconciled Mixed (`50 seed + 4,813 warm-up + 35,950 measured = 40,813`), Unique POST (`1,000 warm-up + 30,000 measured = 31,000`), Read-Heavy (`50 seed`), and pre-AGY-012 rows (`20,312`, total DB `92,175`).
+  - Corrected Mixed telemetry window count in `docs/PERFORMANCE_REPORT.md` from "15 windows (`W3`–`W16`)" to `16` recorded windows (`W1` warm-up, `W2` straddling boundary, `W3`–`W16` = `14` full measured windows, plus ~27s unwindowed tail) and noted that Mixed `post_cancel` targeted terminal `seed_job_ids`.
+- **Decision (Accepted / Modified / Rejected):** Pending human review.
+- **Human Review:** Pending.
+- **Verification:** Read-only PostgreSQL reconciliation query, raw `.json`/`.log` inspection, `git diff --check`, and `git status -s`.
+- **Evidence:** `artifacts/perf/*.json`, `artifacts/perf/*.log`, `docs/PERFORMANCE_REPORT.md`, `git diff --check`.
+
 ---
 
-### Planned Activities (Not Yet Started)
+### Stage-by-Stage Audit Summary (`AGY-005` to `AGY-013`)
 
-Application implementation with Antigravity has **not** started. Planned activities include:
-- Final human approval of `docs/DESIGN.md`, `docs/ARCHITECTURE.md`, and `docs/AI_USAGE.md`.
-- Designing and generating database models and initial `Alembic` migrations.
-- Implementing FastAPI endpoints (`POST /jobs`, `GET /jobs/{job_id}`, `GET /jobs`, `POST /jobs/{job_id}/cancel`).
-- Implementing independent worker processes (`>= 4` workers), fixed-interval polling, background/checkpointed heartbeats, cooperative cancellation, recovery sweeps, and `execution_effects` atomic completion.
-- Setting up `Docker Compose` for API, PostgreSQL, and `>= 4` workers.
-- Writing and running `pytest` integration, race-condition, and crash-recovery tests.
+| Stage | AI Tool | AI Contribution | Accepted Suggestions | Human Verification | Changes Made | Rejected Suggestions | Evidence | Outcome |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **AGY-005** (Database Foundation) | Antigravity | `Job`, `ExecutionEffect`, `Base`, `session.py`, `0001_initial_schema.py`, `test_database_models.py` | Synchronous SQLAlchemy 2.x + Psycopg 3, partial indexes, `UNIQUE(job_id)` | Developer configured `.env` PostgreSQL credentials via `getpass`; verified `pytest` | Fixed double-prefixed constraint names (`ck_jobs_ck_jobs_*`) caught by `alembic --sql` | None | `alembic upgrade head --sql`, `23` passed in `pytest` | **Verified** |
+| **AGY-006** (REST API) | Antigravity | `app/schemas/`, `app/repositories/job_repository.py`, `app/services/job_service.py`, `app/api/`, `test_api_jobs.py` | `Idempotency-Key` header/body support, SHA-256 `request_hash`, `409` on mismatch, `200` on terminal cancel | Executed full `pytest` suite against PostgreSQL | None | None | `36` passed in `pytest -v` | **Verified** |
+| **AGY-007** (Worker Engine) | Antigravity | `worker_repository.py`, `LeaseHeartbeat`, `SimulatedJobExecutor`, `WorkerRunner`, `test_worker_engine.py` | Dedicated-thread/session heartbeat, `clock_timestamp()` + `fencing_token`, recovery precedence | Executed `python -m app.worker --help` and full `pytest` suite | Fixed `test_recovery_versus_completion_race_serializes_cleanly` after `SKIP LOCKED` skipped locked row | Initial barrier-only race test assertion (`requeued == 1`) rejected/replaced | `48` passed in `pytest -v` | **Verified** |
+| **AGY-008** (Docker Compose & Chaos Harness) | Antigravity | `Dockerfile`, `docker-compose.yml`, `scripts/chaos_harness.py`, initial `docs/CHAOS_REPORT.md` | 4-replica default worker service scalable to 8, host port `5433`, immutable `.log`/`.json` artifacts | Developer started Docker Desktop and executed Runs A, B, and C | None to code; `AGY-009` audited `~9.1s` effective kill cadence | None | `run_20261112_095909_seed42_55d8b3`, `run_20261112_100147_seed42_442bd4`, `run_20261112_100304_seed42_9b42c4` | **Partially Verified** (kill cadence `~9.1s` vs `2s`) |
+| **AGY-009** (Evidence & Compliance Audit) | Antigravity | Audited `artifacts/chaos/`, updated `docs/CHAOS_REPORT.md` and `docs/AI_USAGE.md`, built 26-item matrix | `DON'T SHIP at 100 RPS yet` provisional verdict; explicit distinction of tested vs assumed behavior | Pending | Documented `_chaos_loop` cadence limitation and audit findings | None | `artifacts/chaos/*.json`, `artifacts/chaos/*.log`, `git diff --check`, `pytest -v` | **Verified** |
+| **AGY-010** (Performance Baseline) | Antigravity | Audited `EXPLAIN` plans & pools, created `scripts/load_test.py`, ran `19` baseline tests, created `docs/PERFORMANCE_REPORT.md` | Isolated single-process API write bottleneck + redundant `JobService.create_job()` `SELECT` | Pending | None to app code (stopped before Phase 6 optimization per instructions) | None | `artifacts/perf/*.json`, `artifacts/perf/*.log`, `docs/PERFORMANCE_REPORT.md` | **Verified** (`DON'T SHIP at 100 RPS`) |
+| **AGY-011** (Targeted Optimization) | Antigravity | Opt A (`set_committed_value` in `JobService.create_job`), Opt B (`--workers 4` + `80`-conn pool budget), `8` benchmark runs, `49` tests | Both optimizations verified one variable at a time; `0` correctness regressions | Pending | Added `test_create_job_unique_triggers_no_post_commit_select_or_lazy_load` | None | `artifacts/perf/*.json`, `pytest -v` (`49 passed`) | **Verified** (`SHIP at 100 RPS`) |
+| **AGY-012** (Sustained Stability) | Antigravity | Extended `scripts/load_test.py` telemetry; ran `15m` mixed, `5m` unique POST, `5m` read-heavy (`150k` requests at `100 RPS`) | Flat latency, `pg_max_conns=28/100`, `0` restarts, `0` errors, `0` invariant violations | Pending | Window count wording corrected in `AGY-013` | None | `perf_mixed_100rps_*1d7d1d`, `perf_post_unique_100rps_*db4a2b`, `perf_read_heavy_100rps_*9b041c` | **Verified** (`SHIP at 100 RPS`) |
+| **AGY-013** (Evidence Reconciliation) | Antigravity | Reconciled `seed:`/`wu:`/`u:` counts in PostgreSQL and corrected `W1`–`W16` window accounting in `PERFORMANCE_REPORT.md` | Exact integer reconciliation (`40,813`, `31,000`, `50`, `20,312` pre-existing) | Pending | No app/DB code modified | None | Read-only SQL query, `git diff --check` | **Verified** |
+
+---
+
+### Preserved History of Failed Attempts & Blockers
+
+1. **`AGY-005` Initial Alembic Constraint Naming Bug:** `alembic upgrade head --sql` exposed double-prefixed constraint names (`ck_jobs_ck_jobs_valid_status`, `ck_execution_effects_ck_execution_effects_*`) because `Base.metadata.naming_convention` prefixed already-prefixed constraint names in `0001_initial_schema.py`. Corrected before live migration; verified with `alembic upgrade head --sql` and `Base.metadata.create_all` mock DDL.
+2. **`AGY-005` Initial `pytest` Environment Failure (`1 passed, 22 errors`):** Before `.env` credentials were configured, `pytest -v` exited `1` because `postgres_url` explicitly refused SQLite fallback (`Failed: TEST_DATABASE_URL or DATABASE_URL must be set...`). Resolved when developer configured `.env` via local `getpass`.
+3. **`AGY-007` Initial Race Test Failure (`47 passed, 1 failed`):** `test_recovery_versus_completion_race_serializes_cleanly` failed (`assert 0 == 1`) because `complete_job_atomically` acquired `FOR UPDATE` first and `recover_expired_jobs` used `SKIP LOCKED`, legitimately skipping the locked row. Rewritten to test deterministic lock-contention serialization (`48 passed`).
+4. **`AGY-008` Initial Docker Daemon Blocker:** Docker Desktop daemon was not running during `AGY-008` (`//./pipe/dockerDesktopLinuxEngine` not found), blocking live Compose runs until the developer started Docker Desktop and executed Runs A–C.
+
+---
+
+### Planned Activities (Post-Submission / Future Hardening)
+
+- All core take-home stages (`AGY-000`–`AGY-013`) and final audit/documentation stages (`AGY-014`–`AGY-017`) are complete, including the sustained 100 RPS load tests (`AGY-012`) and evidence reconciliation (`AGY-013`).
+- Optional future hardening (out of scope for take-home submission): experimental multi-node clock-skew injection, network partition (`tc netem`) chaos, PostgreSQL failover testing, and a decoupled strict `2.0s` `SIGKILL` cadence run.
 
 ---
 
@@ -297,7 +478,7 @@ Use this template for every future implementation, migration, or testing task:
 - **Environment & Stack (Completed Setup):**
   - Python `>= 3.12` managed with `uv` (`pyproject.toml`, `uv.lock`).
   - Core stack: `fastapi`, synchronous `sqlalchemy` (2.x), `psycopg[binary]` (Psycopg 3), `alembic`, `pydantic-settings`, `uvicorn[standard]`, `httpx`, and `pytest`.
-- **Architecture Design (Approved in Human Review #1; Pending Implementation):**
+- **Architecture Design (Approved in Human Review #1; Implemented in `AGY-005`–`AGY-008` & Optimized in `AGY-011`):**
   - PostgreSQL single-source-of-truth coordination using `SELECT ... FOR UPDATE SKIP LOCKED`.
   - Fixed-interval polling across `>= 4` independent worker processes and offset/limit pagination.
   - Idempotent job creation via deterministic payload hash with `HTTP 409 Conflict` on key/payload mismatch.
@@ -336,21 +517,64 @@ Use this template for every future implementation, migration, or testing task:
 - Developer completed Architecture Review #3, identifying the retryable vs. cancellation precedence SQL inconsistency and non-retryable precedence ambiguity in `docs/ARCHITECTURE.md`.
 
 ### Pending Human Verification
-- Final human approval of `docs/DESIGN.md`, `docs/ARCHITECTURE.md`, and `docs/AI_USAGE.md`.
-- Code review of all future application modules, Alembic migrations, and Docker Compose configuration.
-- Independent execution of `alembic` migrations, `>= 4` worker runs, and `pytest` tests.
+- Final human review of `AGY-009`–`AGY-017` artifacts and documentation (`docs/CHAOS_REPORT.md`, `docs/PERFORMANCE_REPORT.md`, `docs/AI_USAGE.md`, `README.md`) prior to submission.
 
 ---
 
 ## 8. Verification Evidence
 
-### Available Evidence (Observed in Repository)
-- `pyproject.toml` and `uv.lock`: Confirm declared Python `>=3.12` and installed package lockfile for `fastapi`, `sqlalchemy`, `psycopg[binary]`, `alembic`, `pydantic-settings`, `uvicorn[standard]`, `httpx`, and `pytest`.
-- `.venv/`: Present locally from developer setup.
-- `main.py` and `.gitignore`: Starter scaffolding only; no queue application code exists.
-- `docs/DESIGN.md`, `docs/ARCHITECTURE.md`, and `docs/AI_USAGE.md`: Documentation files only, reflecting all pre-implementation review decisions (`AGY-000` through `AGY-004`).
+### Available Evidence (Observed in Repository & Command Runs)
+- `pyproject.toml` and `uv.lock`: Unmodified; declare Python `>=3.12` and installed dependencies (`alembic`, `fastapi`, `psycopg[binary]`, `pydantic-settings`, `sqlalchemy`, `uvicorn[standard]`, `httpx`, `pytest`).
+- `artifacts/chaos/run_20261112_095909_seed42_55d8b3.{json,log}`: 100-job / 4-worker smoke run (`PASS`, 4.697s).
+- `artifacts/chaos/run_20261112_100147_seed42_442bd4.{json,log}`: 500-job / 8-worker chaos pilot (`PASS`, 10.573s, 1 `SIGKILL`, 1 restart).
+- `artifacts/chaos/run_20261112_100304_seed42_9b42c4.{json,log}`: 10,000-job / 8-worker full chaos run (`PASS`, 121.739s, 9,986 succeeded, 14 cancelled, 13 `SIGKILL`s, 13 restarts, 1,500 duplicates, 20 `409` probes).
+- `artifacts/perf/` & `docs/PERFORMANCE_REPORT.md`: `AGY-010` baseline (`19` runs), `AGY-011` Opt A+B (`8` runs), `AGY-012` sustained 100 RPS runs (`perf_mixed_100rps_20261112_103730_1d7d1d`, `perf_post_unique_100rps_20261112_105450_db4a2b`, `perf_read_heavy_100rps_20261112_110017_9b041c`; `150,000` measured requests, `0` errors, `0` invariant violations), and `AGY-013` PostgreSQL reconciliation.
+- `.venv\Scripts\pytest.exe -v`: `49 passed, 5 warnings` against local PostgreSQL (post-`AGY-011` regression suite, up from `48 passed` in `AGY-007`).
 
 ### Not Yet Executed (No Evidence Available)
-- No `pytest` test suite exists or has been executed.
-- No `alembic` migrations have been generated or applied.
-- No PostgreSQL database, FastAPI server, Docker Compose stack, or worker processes have been started or tested.
+- Experimental container clock-skew injection, network partition (`tc netem`), or PostgreSQL failover tests.
+- Decoupled strict `2.0s` `SIGKILL` cadence chaos re-run (Run C achieved `~9.1s` effective cadence due to synchronous container restart polling).
+
+---
+
+## 9. AI Reliability Assessment
+
+- **Where AI-Generated Output Required Additional Verification:**
+  - *Constraint naming in Alembic:* Static offline SQL (`alembic upgrade head --sql`) caught double-prefixed constraint names that looked plausible in Python code.
+  - *Concurrency test assumptions:* `test_recovery_versus_completion_race_serializes_cleanly` initially assumed `SKIP LOCKED` would block and return `requeued == 1` instead of skipping a row locked by `complete_job_atomically`.
+  - *Chaos kill cadence:* Inspecting Run C's raw `.json` timestamps revealed that synchronous container restart polling inside `_chaos_loop` stretched the effective `SIGKILL` cadence from `2.0s` to `~9.1s` (`13` kills in `121.7s`).
+- **Assumptions Not Experimentally Verified:** PostgreSQL server `clock_timestamp()` prevents container clock skew by design, but multi-node clock drift, network partitions (`tc netem`), and PostgreSQL failover were not experimentally tested.
+- **Key Engineering Takeaway:** AI-generated backend infrastructure accelerates boilerplate and SQL/test scaffolding, but requires strict human verification against raw execution artifacts, offline DDL output, and lock-ordering semantics rather than trusting summary claims.
+
+---
+
+## 10. Take-Home Requirement Coverage Matrix
+
+| # | Requirement | Status | Concrete Evidence / Next Action |
+| :---: | :--- | :--- | :--- |
+| 1 | Job creation with idempotency key | **VERIFIED** | `app/api/routes/jobs.py`, `tests/test_api_jobs.py`, Run C (`10,000` jobs) |
+| 2 | Job status retrieval | **VERIFIED** | `GET /jobs/{job_id}`, `test_get_job_and_unknown_job_404` |
+| 3 | Paginated job listing | **VERIFIED** | `GET /jobs` (`limit`/`offset`), `test_list_jobs_pagination_deterministic_ordering_and_status_filter` |
+| 4 | Job cancellation | **VERIFIED** | `POST /jobs/{job_id}/cancel`, `test_api_jobs.py`, `test_worker_engine.py`, Run C (`14` cancelled) |
+| 5 | Required job states (`queued -> running -> succeeded / failed / cancelled`) | **VERIFIED** | `JobStatus`, `ck_jobs_valid_status`, `tests/test_database_models.py` |
+| 6 | PostgreSQL or SQLite choice and rationale | **VERIFIED** | PostgreSQL chosen; SQLite rejected in `app/core/config.py` & `tests/conftest.py`; rationale in `DESIGN.md` |
+| 7 | At least four independent workers | **VERIFIED** | `docker-compose.yml` (`replicas: 4`), Run A (`4` containers), Runs B/C (`8` containers) |
+| 8 | Execution side effect | **VERIFIED** | `execution_effects` (`UNIQUE(job_id)`), `test_worker_engine.py`, Runs A–C |
+| 9 | One-page design note | **VERIFIED** | `docs/DESIGN.md` |
+| 10 | Worker claiming strategy | **VERIFIED** | `FOR UPDATE SKIP LOCKED` in `WorkerRepository.claim_next_job`, `test_worker_engine.py` |
+| 11 | Dead worker detection | **VERIFIED** | `lease_expires_at <= clock_timestamp()` + `recover_expired_jobs`, `test_worker_engine.py` |
+| 12 | Running cancellation semantics | **VERIFIED** | Cooperative `cancel_requested = TRUE` + checkpoints, `test_cooperative_cancellation_aborts_without_effect` |
+| 13 | Delivery/effect guarantee and rationale | **VERIFIED** | `docs/DESIGN.md` §5, `docs/ARCHITECTURE.md` §7 (bounded retries + scoped ACID commit + `UNIQUE(job_id)`) |
+| 14 | 10,000-job chaos harness | **VERIFIED** | `scripts/chaos_harness.py`, Run C (`run_20261112_100304_seed42_9b42c4`) |
+| 15 | Eight workers | **VERIFIED** | Run B & Run C observed `8` distinct worker container IDs |
+| 16 | Random SIGKILL approximately every two seconds | **PARTIALLY VERIFIED** | Run C ran `13` `SIGKILL`s with `--kill-interval 2.0`, but synchronous restart wait yielded `~9.1s` effective cadence; decouple kill timer from restart wait if strict 2s cadence is required |
+| 17 | Concurrent duplicate POST requests | **VERIFIED** | `test_concurrent_idempotent_requests_same_payload`, Run C (`1,500` duplicates, `0` mismatches) |
+| 18 | Concurrent cancellation requests | **VERIFIED** | Run C (`1,000` concurrent cancels -> `14` cancelled, `9,986` succeeded) |
+| 19 | All required invariants | **VERIFIED** | All 6 invariants `PASS` in Runs A, B, and C `.json`/`.log` |
+| 20 | Raw output and number of runs | **VERIFIED** | `3` complete runs preserved in `artifacts/chaos/` (`.json` + `.log`) |
+| 21 | Failed-run preservation | **PARTIALLY VERIFIED** | Harness uses unique non-overwriting filenames even on failure (`finally` block), though no failed chaos run is in `artifacts/chaos/`; earlier failed `pytest` runs are recorded in `AI_USAGE.md` |
+| 22 | Silent failure analysis | **VERIFIED** | `docs/CHAOS_REPORT.md` §9 |
+| 23 | Production verdict at 100 RPS | **VERIFIED (`SHIP at 100 RPS`)** | `AGY-011` Opt A+B (`99.97 RPS` `post_unique`, `99.98 RPS` `mixed`), `AGY-012` sustained 100 RPS (`15m` mixed, `5m` unique POST, `5m` read-heavy; `0` errors, `0` invariant violations), and `AGY-013` reconciliation (`docs/PERFORMANCE_REPORT.md`) |
+| 24 | What surprised us and what still concerns us | **VERIFIED** | `docs/CHAOS_REPORT.md` §§10–11, `docs/AI_USAGE.md` §9 |
+| 25 | AI usage disclosure | **VERIFIED** | `docs/AI_USAGE.md` |
+| 26 | `docker compose up` reproducibility | **VERIFIED** | `docker-compose.yml`, `Dockerfile`, Runs A–C |

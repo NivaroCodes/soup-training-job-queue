@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${COMPOSE_POSTGRES_USER:-soup}
+      POSTGRES_PASSWORD: ${COMPOSE_POSTGRES_PASSWORD:-soup}
+      POSTGRES_DB: ${COMPOSE_POSTGRES_DB:-soup_training}
+    ports:
+      - "${COMPOSE_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${COMPOSE_POSTGRES_USER:-soup} -d ${COMPOSE_POSTGRES_DB:-soup_training}",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 3s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${COMPOSE_POSTGRES_USER:-soup}:${COMPOSE_POSTGRES_PASSWORD:-soup}@postgres:5432/${COMPOSE_POSTGRES_DB:-soup_training}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "4",
+      ]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${COMPOSE_POSTGRES_USER:-soup}:${COMPOSE_POSTGRES_PASSWORD:-soup}@postgres:5432/${COMPOSE_POSTGRES_DB:-soup_training}
+      DB_POOL_SIZE: ${API_DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${API_DB_MAX_OVERFLOW:-5}
+    ports:
+      - "${COMPOSE_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 3s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${COMPOSE_POSTGRES_USER:-soup}:${COMPOSE_POSTGRES_PASSWORD:-soup}@postgres:5432/${COMPOSE_POSTGRES_DB:-soup_training}
+      DB_POOL_SIZE: ${WORKER_DB_POOL_SIZE:-3}
+      DB_MAX_OVERFLOW: ${WORKER_DB_MAX_OVERFLOW:-2}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-0.2}
+      WORKER_LEASE_TTL_SECONDS: ${WORKER_LEASE_TTL_SECONDS:-30.0}
+      WORKER_HEARTBEAT_INTERVAL_SECONDS: ${WORKER_HEARTBEAT_INTERVAL_SECONDS:-10.0}
+      WORKER_RECOVERY_INTERVAL_SECONDS: ${WORKER_RECOVERY_INTERVAL_SECONDS:-5.0}
+      WORKER_RECOVERY_BATCH_SIZE: ${WORKER_RECOVERY_BATCH_SIZE:-50}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      replicas: 4
+    restart: unless-stopped
+
+volumes:
+  pg_data:
