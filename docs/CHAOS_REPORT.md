@@ -12,9 +12,9 @@ The `soup-training-job-queue` service was verified across three complementary ev
 2. **Docker Compose Smoke Run (`run_20261112_095909_seed42_55d8b3`):** `100` jobs across `4` independent worker containers with chaos disabled completed in `4.697s` (`100` succeeded, `100` execution effects, `0` errors, all 6 invariants `PASS`).
 3. **Docker Compose Chaos Pilot & Full Chaos Run:**
    - **Pilot (`run_20261112_100147_seed42_442bd4`):** `500` jobs across `8` worker containers, `1` `SIGKILL` + `1` restart, `500` succeeded, `500` effects, all 6 invariants `PASS`.
-   - **Full Chaos (`run_20261112_100304_seed42_9b42c4`):** `10,000` logical jobs across `8` worker containers over `121.739s`, `13` `SIGKILL` events + `13` restarts, `1,500` duplicate idempotent `POST` requests, `20` `HTTP 409` probes, `1,000` concurrent `POST /cancel` requests -> `9,986` succeeded (`9,986` effects), `14` cancelled, `0` lost jobs, `0` duplicate effects, `0` stuck jobs, all 6 invariants `PASS`.
+   - **Full Chaos (`run_20261112_100304_seed42_9b42c4`):** `10,000` logical jobs across `8` worker containers over `121.739s`, `13` `SIGKILL` events + `13` restarts, `1,500` duplicate idempotent `POST` requests, `20` `HTTP 409` probes, `1,000` concurrent `POST /cancel` requests -> `9,986` succeeded (`9,986` effects), `14` cancelled, `0` lost jobs, `0` duplicate effects, `0` stuck jobs, all 6 invariants `PASS`. *(Note on cancellation coverage: While 1,000 concurrent cancellation requests were issued during Run C, the short duration of simulated jobs (~30 ms) meant that almost all jobs finished before cancellation requests arrived, resulting in exactly 14 actual cancellation transitions. This verified race safety with completion and terminal state immutability, but active cooperative abortion of in-flight running jobs is deterministically covered by the pytest integration suite rather than by high-churn chaos timing.)*
 
-**Audit Caveat:** The chaos runs demonstrate correctness and crash-recovery integrity under the tested workload (`job_steps=2`, `step_duration_ms=15.0`, effective `SIGKILL` cadence `~9.1s` due to synchronous container restart wait), **not** sustained 100 RPS throughput, tail latency (p95/p99), or connection-pool saturation.
+**Audit Caveat:** The chaos runs demonstrate correctness and crash-recovery integrity under the tested workload (`job_steps=2`, `step_duration_ms=15.0`, effective `SIGKILL` cadence `~9.1s` due to synchronous container restart wait), **not** a strict 2.0s wall-clock kill cadence, sustained 100 RPS throughput, tail latency (p95/p99), or connection-pool saturation.
 
 ---
 
@@ -52,7 +52,7 @@ Implemented in [scripts/chaos_harness.py](../scripts/chaos_harness.py):
 - **Deterministic Seeding:** Uses `random.Random(seed)` (`seed=42` in Runs A–C) to select duplicate (`15%`), cancellation (`10%`), and `409` conflict-probe (`20`) indices, as well as random `SIGKILL` worker targets.
 - **Concurrent Workload:** Submits unique jobs (`idempotency_key = "<run_id>:job:<idx>"`), concurrent duplicate `POST /jobs`, `409` conflict probes (reused key with tampered payload), and concurrent `POST /jobs/{id}/cancel` requests via `ThreadPoolExecutor(max_workers=32)`.
 - **Fault Injection:** Background thread enumerates running worker containers (`docker compose ps -q worker`), sends `docker kill -s SIGKILL <container_id>` after `--kill-interval`, waits for auto-restart (or runs `docker start`), and logs both events.
-- **Artifact Preservation:** Writes immutable `<run_id>.log` and `<run_id>.json` files in `artifacts/chaos/` without overwriting prior runs, returning non-zero exit code if any invariant fails.
+- **Artifact Preservation:** Writes immutable `<run_id>.log` and `<run_id>.json` files in `artifacts/chaos/` without overwriting prior runs, returning non-zero exit code if any invariant fails. Primary structured evidence is committed to Git via `.json` artifacts; `.log` files are generated locally as human-readable console outputs and are ignored by `.gitignore` (`*.log`).
 
 ---
 
@@ -74,7 +74,7 @@ Evidence is separated into four distinct tiers:
 | **Run B (Pilot)** | `run_20261112_100147_seed42_442bd4` | 500 | 8 | 42 | Enabled (`2.0s`) | 10.573s | `succeeded: 500` | 500 | 1 / 1 | 0 | **PASS** |
 | **Run C (Full Chaos)** | `run_20261112_100304_seed42_9b42c4` | 10,000 | 8 | 42 | Enabled (`2.0s`*) | 121.739s | `succeeded: 9986`, `cancelled: 14` | 9,986 | 13 / 13 | 0 | **PASS** |
 
-*\*Audit Note on Run C Kill Cadence:* Although `--kill-interval` was `2.0s`, `_chaos_loop` waits synchronously for each killed container to restart (`~6.4s` on Docker Desktop) before the next `2.0s` sleep, resulting in `13` `SIGKILL`s over `121.739s` (~1 kill every `~9.1s`).
+*\*Audit Note on Run C Kill Cadence:* Although `--kill-interval` was `2.0s`, `_chaos_loop` in `scripts/chaos_harness.py` waits synchronously for each killed container to restart (`~6.4s` on Docker Desktop) before beginning the next `2.0s` sleep, resulting in `13` `SIGKILL`s over `121.739s` (~1 kill every `~9.1s`). Consequently, Run C does not satisfy a strict 2.0s wall-clock kill cadence; decoupling kill timing from restart wait is scheduled for AGY-021.
 
 ---
 
@@ -84,12 +84,12 @@ All six invariants were verified directly against PostgreSQL after queue drain i
 
 | Invariant | What It Checks | How It Is Checked (PostgreSQL Query / Harness Check) | Run A | Run B | Run C | Evidence Source |
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| `no_lost_jobs` | Every submitted logical job has exactly one DB row and zero HTTP submission errors. | `COUNT(*)` on `jobs` for `run_id` prefix == `--jobs` AND `len(http_errors) == 0`. | PASS (`100/100`) | PASS (`500/500`) | PASS (`10000/10000`) | Run A/B/C `.json` & `.log` |
-| `no_duplicate_side_effects` | No job has more than one committed `execution_effects` row. | `SELECT e.job_id FROM execution_effects e JOIN jobs j ... GROUP BY e.job_id HAVING COUNT(*) > 1` == `0` (backed by `uq_execution_effects_job_id`). | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` & `.log` |
-| `no_stuck_running_or_queued_jobs` | All jobs drained to terminal states after recovery window. | `running == 0` AND `queued == 0` for `run_id` prefix after drain. | PASS (`0/0`) | PASS (`0/0`) | PASS (`0/0`) | Run A/B/C `.json` & `.log` |
-| `consistent_final_states` | `succeeded` jobs have 1 effect and `cancel_requested = FALSE`; non-succeeded jobs have 0 effects. | `LEFT JOIN` / `JOIN` queries checking `succeeded_missing_effect == 0`, `non_succeeded_with_effect == 0`, `succeeded_with_cancel == 0`, `effects == succeeded`. | PASS (`100=100`) | PASS (`500=500`) | PASS (`9986=9986`) | Run A/B/C `.json` & `.log` |
-| `fencing_integrity` | No `execution_effects` row carries a stale or invalid `fencing_token`. | `execution_effects.fencing_token != jobs.fencing_token OR execution_effects.fencing_token < 1` count == `0`. | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` & `.log` |
-| `idempotency_and_409_conflict` | Repeated identical POSTs return the original job ID; mismatched payload reuses return `HTTP 409`. | Client-side verification of `dup_resp.id == original_id` and `conflict_resp.status_code == 409` (`20` probes/run). | PASS (`15` dup, `20` 409) | PASS (`75` dup, `20` 409) | PASS (`1500` dup, `20` 409) | Run A/B/C `.json` & `.log` |
+| `no_lost_jobs` | Every submitted logical job has exactly one DB row and zero HTTP submission errors. | `COUNT(*)` on `jobs` for `run_id` prefix == `--jobs` AND `len(http_errors) == 0`. | PASS (`100/100`) | PASS (`500/500`) | PASS (`10000/10000`) | Run A/B/C `.json` (tracked; `.log` local) |
+| `no_duplicate_side_effects` | No job has more than one committed `execution_effects` row. | `SELECT e.job_id FROM execution_effects e JOIN jobs j ... GROUP BY e.job_id HAVING COUNT(*) > 1` == `0` (backed by `uq_execution_effects_job_id`). | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` (tracked; `.log` local) |
+| `no_stuck_running_or_queued_jobs` | All jobs drained to terminal states after recovery window. | `running == 0` AND `queued == 0` for `run_id` prefix after drain. | PASS (`0/0`) | PASS (`0/0`) | PASS (`0/0`) | Run A/B/C `.json` (tracked; `.log` local) |
+| `consistent_final_states` | `succeeded` jobs have 1 effect and `cancel_requested = FALSE`; non-succeeded jobs have 0 effects. | `LEFT JOIN` / `JOIN` queries checking `succeeded_missing_effect == 0`, `non_succeeded_with_effect == 0`, `succeeded_with_cancel == 0`, `effects == succeeded`. | PASS (`100=100`) | PASS (`500=500`) | PASS (`9986=9986`) | Run A/B/C `.json` (tracked; `.log` local) |
+| `fencing_integrity` | No `execution_effects` row carries a stale or invalid `fencing_token`. | `execution_effects.fencing_token != jobs.fencing_token OR execution_effects.fencing_token < 1` count == `0`. | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` (tracked; `.log` local) |
+| `idempotency_and_409_conflict` | Repeated identical POSTs return the original job ID; mismatched payload reuses return `HTTP 409`. | Client-side verification of `dup_resp.id == original_id` and `conflict_resp.status_code == 409` (`20` probes/run). | PASS (`15` dup, `20` 409) | PASS (`75` dup, `20` 409) | PASS (`1500` dup, `20` 409) | Run A/B/C `.json` (tracked; `.log` local) |
 
 ---
 
@@ -99,7 +99,7 @@ All six invariants were verified directly against PostgreSQL after queue drain i
 | :--- | :--- | :--- | :--- |
 | **Double claim** | `SELECT ... FOR UPDATE SKIP LOCKED` + atomic `UPDATE ... WHERE status = 'queued'` | **Integration (`pytest`):** `test_multiple_workers_claim_different_jobs_and_no_double_claim`, `test_four_workers_racing_on_single_job_no_double_claim` + **Runs A–C** | **VERIFIED:** 4-thread barrier race claimed each job once; 0 duplicate claims across 10,000 jobs. |
 | **Zombie worker after lease expiry** | `fencing_token` + `lease_expires_at > clock_timestamp()` + `rowcount == 1` on all worker mutations; `UNIQUE(job_id)` on `execution_effects` | **Integration (`pytest`):** `test_expired_lease_rejects_...`, `test_zombie_worker_rejected_...` + **Run C** (`13` kills, `0` fencing mismatches) | **VERIFIED:** Expired/stale workers rejected with `0` stale effects committed. |
-| **Cancel / complete race** | Row lock (`SELECT ... FOR UPDATE`) serializes API `cancel_requested = TRUE` vs. worker `cancel_requested = FALSE` check | **Integration (`pytest`):** `test_cooperative_cancellation_...`, `test_retryable_failure_...`, `test_non_retryable_failure_...` + **Run C** (`14` cancelled, `0` `succeeded_with_cancel`) | **VERIFIED:** Completed jobs never overwritten; cancelled jobs never committed `execution_effects`. |
+| **Cancel / complete race** | Row lock (`SELECT ... FOR UPDATE`) serializes API `cancel_requested = TRUE` vs. worker `cancel_requested = FALSE` check | **Integration (`pytest`):** `test_cooperative_cancellation_aborts_without_effect`, `test_running_cancellation_commits_cleanly`, `test_retryable_failure_...` + **Run C** (`1,000` cancels sent -> `14` cancelled, `9,986` succeeded, `0` `succeeded_with_cancel`) | **VERIFIED:** Completed jobs never overwritten; cancelled jobs never committed `execution_effects`. In Run C, 14 actual cancellations occurred; full cooperative running cancellation coverage relies on deterministic pytest integration tests. |
 | **Duplicate request retry** | `UNIQUE(idempotency_key)` + SHA-256 `request_hash` + `IntegrityError` rollback/re-read | **Integration (`pytest`):** `test_concurrent_idempotent_requests_same_payload`, `..._conflicting_payloads` + **Run C** (`1,500` dupes, `20` 409 probes) | **VERIFIED:** `0` mismatches, `0` 409 failures. |
 | **Transaction isolation (`READ COMMITTED`)** | Exclusive row locks cause waiting transactions to re-evaluate `WHERE` predicates against committed row state | **Integration (`pytest`):** `test_recovery_versus_completion_race_serializes_cleanly` | **VERIFIED:** Completion blocked behind recovery, re-evaluated after commit, and rolled back cleanly. |
 | **Clock skew assumptions** | All lease grants, renewals, and expiry checks use PostgreSQL server `clock_timestamp()` | **Design assumption (not experimentally skew-tested):** SQL inspection of `worker_repository.py` / `job_repository.py` | **NOT EXPERIMENTALLY TESTED:** Assumes single authoritative PostgreSQL primary clock; container clock skew not injected. |
@@ -108,8 +108,8 @@ All six invariants were verified directly against PostgreSQL after queue drain i
 
 ## 10. Known Limitations
 
-1. **Short Simulated Job Duration (~30 ms):** In Runs A–C (`job_steps=2`, `step_duration_ms=15.0`), most jobs completed rapidly before concurrent `POST /cancel` requests arrived (`14` of `1,000` cancelled in Run C; `0` of `10` in Run A; `0` of `50` in Run B).
-2. **Synchronous Restart Wait Reduces Kill Frequency:** `_chaos_loop` waits for container restart (~6.4s) before the next `2.0s` interval, yielding `13` kills in `121.7s` (~1 every `9.1s`) rather than every `2.0s` wall-clock.
+1. **Short Simulated Job Duration (~30 ms) & Cancellation Coverage:** In Runs A–C (`job_steps=2`, `step_duration_ms=15.0`), most jobs completed rapidly before concurrent `POST /cancel` requests arrived (`14` of `1,000` cancelled in Run C; `0` of `10` in Run A; `0` of `50` in Run B). While this confirms that concurrent cancellation requests do not corrupt completed states or double-commit effects, it does not constitute high-volume testing of active cooperative abortion in running workers. That behavior is validated deterministically in the pytest suite (`tests/test_worker_engine.py`).
+2. **Synchronous Restart Wait Reduces Kill Frequency:** `_chaos_loop` waits for container restart (~6.4s) before the next `2.0s` interval, yielding `13` kills in `121.7s` (~1 every `9.1s`) rather than every `2.0s` wall-clock. Run C validates recovery from repeated SIGKILLs, but does not satisfy a strict 2-second kill cadence; decoupling kill timing from restart wait is scheduled for AGY-021.
 3. **Simulated Work Only:** `SimulatedJobExecutor` performs in-memory steps and commits only to PostgreSQL `execution_effects`.
 4. **No Performance / Latency Profiling:** Runs A–C did not measure API p50/p95/p99 latency, sustained 100 RPS arrival rates, or PostgreSQL connection-pool saturation.
 
@@ -126,7 +126,13 @@ All six invariants were verified directly against PostgreSQL after queue drain i
 
 ---
 
-## 12. Production Readiness Assessment
+## 12. What Surprised Us and What Still Concerns Us
+
+What surprised us most during chaos testing was how subtle harness timing interactions can distort fault-injection goals: configured for a `2.0s` `SIGKILL` interval, the harness actually executed kills only every `~9.1s` because synchronous container restart polling blocked the loop, meaning the system faced less frequent crash trauma than intended. Furthermore, despite firing `1,000` concurrent cancellation requests, the ~30 ms duration of simulated jobs meant almost all jobs finished before cancellation could hit them, yielding only `14` actual cancellations and leaving active cooperative cancellation validation almost entirely dependent on deterministic `pytest` tests rather than chaos-scale churn. What still concerns us for production is the behavior under conditions Docker Compose cannot simulate: unmitigated network partitions between workers and PostgreSQL, query tail latency when the `jobs` table reaches millions of rows (given `GET /jobs` performs an exact `count()`), and external side effects that lack PostgreSQL transaction atomicity.
+
+---
+
+## 13. Production Readiness Assessment
 
 **Historical `AGY-009` Provisional Verdict: `DON'T SHIP at 100 RPS yet`**
 
@@ -135,7 +141,7 @@ All six invariants were verified directly against PostgreSQL after queue drain i
 
 ---
 
-## 13. Reproduction Instructions (Windows PowerShell)
+## 14. Reproduction Instructions (Windows PowerShell)
 
 ```powershell
 # 1. Run full PostgreSQL pytest suite
@@ -155,9 +161,11 @@ docker compose up -d --scale worker=8
 
 ---
 
-## 14. Evidence Artifact Index
+## 15. Evidence Artifact Index
 
 - **Smoke Run (Run A):** [run_20261112_095909_seed42_55d8b3.json](../artifacts/chaos/run_20261112_095909_seed42_55d8b3.json)
 - **Chaos Pilot (Run B):** [run_20261112_100147_seed42_442bd4.json](../artifacts/chaos/run_20261112_100147_seed42_442bd4.json)
-- **Full 10,000-Job Chaos Run (Run C):** [run_20261112_100304_seed42_9b42c4.json](../artifacts/chaos/run_20261112_100304_9b42c4.json)
+- **Full 10,000-Job Chaos Run (Run C):** [run_20261112_100304_seed42_9b42c4.json](../artifacts/chaos/run_20261112_100304_seed42_9b42c4.json)
 - **Test Suites:** [test_database_models.py](../tests/test_database_models.py), [test_api_jobs.py](../tests/test_api_jobs.py), [test_worker_engine.py](../tests/test_worker_engine.py)
+
+*(Note on artifact formats: All primary structured evidence is preserved as tracked .json artifacts in Git under artifacts/chaos/. Accompanying .log files were generated during local test execution as console output summaries and are ignored by .gitignore.)*

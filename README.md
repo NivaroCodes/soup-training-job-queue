@@ -80,9 +80,11 @@ Latest verified regression result: **`49 passed, 5 warnings`** against PostgreSQ
 
 - [Design Note](docs/DESIGN.md) — Concise one-page architecture and guarantee summary.
 - [Detailed Architecture Specification](docs/ARCHITECTURE.md) — Full SQL contracts, serialization proofs, and failure policy.
-- [Chaos Testing & Evidence Audit Report](docs/CHAOS_REPORT.md) — 100-job smoke, 500-job pilot, and 10,000-job / 8-worker `SIGKILL` chaos results and silent-failure analysis.
+- [Chaos Testing & Evidence Audit Report](docs/CHAOS_REPORT.md) — 100-job smoke, 500-job pilot, and 10,000-job / 8-worker `SIGKILL` chaos results, silent-failure analysis, and first-person reflections.
 - [Performance Baseline & 100 RPS Validation Report](docs/PERFORMANCE_REPORT.md) — Baseline, Optimization A/B results, and 25 minutes (`150,000` requests) of sustained 100 RPS validation.
 - [AI Usage Record](docs/AI_USAGE.md) — Transparent stage-by-stage AI usage log, failed attempts, reliability assessment, and requirement coverage matrix.
+
+*(Note on raw artifacts: All primary structured benchmark and chaos results are committed to Git as `.json` files in `artifacts/chaos/` and `artifacts/perf/`. Accompanying human-readable `.log` console outputs are produced during local runs and are ignored by `.gitignore`.)*
 
 ---
 
@@ -102,4 +104,5 @@ This supports **`SHIP at 100 RPS`** for the tested workload and configuration; i
 - **External Side Effects:** Exactly-once committed effects apply only inside the PostgreSQL completion transaction (`execution_effects` with `UNIQUE(job_id)`). External side effects (files, webhooks, compute) are outside the ACID boundary.
 - **Clock & Network Assumptions:** Lease expiration relies on PostgreSQL server `clock_timestamp()`; multi-node clock skew and asymmetric network partitions (`tc netem`) were not experimentally injected.
 - **Pagination Scaling:** `GET /jobs` runs `SELECT count(jobs.id)` on every call (`p50=28.27 ms` at ~88k rows), which will grow linearly with table size.
-- **Chaos Kill Cadence:** In chaos Run C, synchronous container restart polling yielded an effective `SIGKILL` cadence of `~9.1s` (`13` kills in `121.7s`) rather than strict `2.0s` wall-clock intervals.
+- **Chaos Kill Cadence:** In chaos Run C, synchronous container restart polling yielded an effective `SIGKILL` cadence of `~9.1s` (`13` kills in `121.7s`) rather than strict `2.0s` wall-clock intervals (decoupling is scheduled for AGY-021).
+- **Chaos Cancellation Coverage:** In chaos Run C, rapid ~30 ms job execution resulted in only 14 actual cancellation transitions from 1,000 requests (9,986 completed before cancellation arrived); cooperative cancellation of in-flight running jobs is verified by deterministic `pytest` integration tests.

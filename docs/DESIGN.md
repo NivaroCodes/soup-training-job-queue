@@ -1,42 +1,35 @@
 # Design Note: Training-Job Queue Service
 
-> **Status:** Approved Design Note (Architecture Review #3 Finalized; **Pending Final Approval, Implementation, and Verification**)  
-> **Companion Specification:** Detailed SQL contracts, serialization mechanics, and implementation risks live in [ARCHITECTURE.md](ARCHITECTURE.md). No application code, migrations, or tests have been implemented yet.
+> **Status:** Implemented & Verified (PostgreSQL 16, FastAPI, 4 Uvicorn processes, independent workers, Alembic migrations; 49 tests passing). Companion specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
-## 1. Architecture & Stack
+### 1. Architecture Rationale: PostgreSQL as Single Source of Truth
+PostgreSQL coordinates job states, leases, fencing tokens, cancellation flags, and execution effects in one engine. ACID transactions, row-level locking (`FOR UPDATE SKIP LOCKED`), and mature indexes eliminate external brokers (Redis/RabbitMQ) or consensus tools (etcd). SQLite was evaluated and rejected because database-level lock contention causes `SQLITE_BUSY` errors under concurrent multi-process writes and cannot scale across containerized worker nodes.
 
-- **API (`FastAPI`):** Stateless HTTP service exposing idempotent job submission (`POST /jobs`), status lookup (`GET /jobs/{job_id}`), offset/limit paginated listing (`GET /jobs`), and cancellation (`POST /jobs/{job_id}/cancel`). Idempotency stores a unique `idempotency_key` with a deterministic `request_hash`: matching payloads return the existing job; mismatched payloads return `HTTP 409 Conflict`.
-- **Database (`PostgreSQL` via synchronous `SQLAlchemy 2.x` + `Psycopg 3` + `Alembic`):** Single source of truth coordinating job state, leases, fencing tokens, cancellation flags, and committed measurable side effects (`execution_effects` with `UNIQUE(job_id)`).
-- **Workers (`>= 4` independent processes):** Separate processes/containers using fixed-interval PostgreSQL polling to claim jobs, emit periodic heartbeats, check cooperative cancellation points, and commit side effects atomically.
+### 2. Atomic Job Claiming (`SELECT FOR UPDATE SKIP LOCKED`)
+Workers poll PostgreSQL independently (`0.2s` interval) and claim jobs using `SELECT ... WHERE status = 'queued' ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED;`. `SKIP LOCKED` bypasses rows locked by concurrent workers, eliminating contention and double claims. In the same transaction, the worker increments `attempt` and `fencing_token`, sets `worker_id`, records `started_at`, sets `lease_expires_at = clock_timestamp() + lease_ttl`, and commits `status = 'running'`.
 
-## 2. Job Lifecycle & Failure Policy
+### 3. Worker Leases & Heartbeat Renewal
+Jobs are protected by time-to-live leases (`30s` TTL). A dedicated background heartbeat thread renews `lease_expires_at` periodically (`10s` interval) via a separate database session. All lease assignment, renewal, and expiry checks strictly use PostgreSQL server **`clock_timestamp()`**—never client clocks or transaction-constant `now()`, which freezes at transaction start.
 
-```text
-queued -> running -> succeeded | failed | cancelled
-```
+### 4. Dead-Worker Detection & Recovery
+A periodic recovery loop sweeps for expired jobs (`status = 'running' AND lease_expires_at <= clock_timestamp()`). Recovery enforces strict precedence: (1) if `cancel_requested = TRUE`, transition to `cancelled`; (2) else if `attempt < max_attempts`, requeue to `queued`; (3) else (`attempt >= max_attempts`), mark as `failed`.
 
-Claiming a job (`queued -> running`) increments `attempt` by `1` and `fencing_token` by `1`:
-- **Retryable execution failure:** Consumes the current attempt and follows strict precedence: (1) if `cancel_requested = TRUE`, transition `running -> cancelled`; (2) else if `attempt < max_attempts`, transition `running -> queued`; (3) else (`attempt >= max_attempts`), transition `running -> failed`. Both `running -> queued` and retryable-exhausted `running -> failed` enforce `cancel_requested = FALSE` alongside `id`, `status = 'running'`, `worker_id`, `fencing_token`, and `lease_expires_at > clock_timestamp()` (`rowcount == 1`), rolling back and re-reading on `0` rows (switching to cooperative cancellation if `cancel_requested = TRUE`, or aborting if lease/ownership was lost or the job is already terminal).
-- **Non-retryable execution failure:** Consumes the current attempt and **takes precedence over a concurrent `cancel_requested = TRUE`**, transitioning directly `running -> failed` regardless of `max_attempts` while enforcing `id`, `status = 'running'`, `worker_id`, `fencing_token`, and `lease_expires_at > clock_timestamp()` (`rowcount == 1` or rollback; never overwrites a terminal state).
-- **Worker crash / lease expiration:** Consumed at claim; recovery checks `cancel_requested = TRUE` **first** (`running -> cancelled`), else requeues (`running -> queued`) while `attempt < max_attempts`, or marks `failed` when `attempt >= max_attempts`.
-- **Terminal states (`succeeded`, `failed`, `cancelled`):** Immutable; no further transitions or side-effect commits are permitted.
+### 5. Fencing Tokens & Stale-Worker Rejection
+To prevent split-brain writes from zombie workers (paused by GC or OS freezes that wake after lease expiry and recovery), jobs carry a monotonically increasing `fencing_token`. Every worker update conditionally checks `fencing_token`, `worker_id`, `status = 'running'`, and `lease_expires_at > clock_timestamp()`. If recovery reclaimed the job, the token changed and lease expired; the stale worker's update matches `rowcount == 0`, triggering an immediate rollback without committing late effects.
 
-## 3. Claiming, Leases & Fencing
+### 6. Cancellation Semantics
+- **Queued:** Atomically updated `queued -> cancelled` directly by the API.
+- **Running (Cooperative):** API sets `cancel_requested = TRUE`. Workers check this flag at safe checkpoints, aborting execution and committing `running -> cancelled` under fencing/lease guards with zero execution effects.
+- **Terminal:** Completed, failed, or cancelled jobs return `HTTP 200 OK` unchanged (idempotent no-op).
 
-- **Atomic Claiming:** Workers claim one queued job per transaction via `SELECT ... WHERE status = 'queued' ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED`, preventing concurrent double-claims.
-- **Authoritative Time & Leases:** All lease assignment, heartbeat renewal, expiration detection (`lease_expires_at <= clock_timestamp()`), and recovery use PostgreSQL **`clock_timestamp()`**—never `now()`, which freezes at transaction start and would misreport validity in long-running or lock-delayed transactions.
-- **Fencing + Lease Validity:** Because `fencing_token` alone leaves a pre-recovery window after lease expiry, every worker state mutation (heartbeats, completion, failure, requeue, and cancellation completion) requires `status = 'running'`, `worker_id`, matching `fencing_token`, **and** `lease_expires_at > clock_timestamp()`, serialized against recovery by PostgreSQL row locks.
+### 7. Delivery Guarantees, Side Effects & Limitations
+- **At-Least-Once Execution Attempts:** Duplicate execution attempts can occur following worker crashes or retryable failures.
+- **Bounded Retries:** Successful execution is **not** guaranteed; retries are strictly bounded by `max_attempts`.
+- **At-Most-One Committed Database Effect:** Measurable effects are persisted in `execution_effects` with `UNIQUE(job_id)`.
+- **Atomic State and Effect Commit:** The `execution_effects` record and `running -> succeeded` transition commit inside the **same atomic PostgreSQL ACID transaction** (`rowcount == 1` or rollback).
+- **Non-DB External Side Effects:** Exactly-once guarantees apply exclusively to database effects within PostgreSQL. External actions (S3 uploads, webhooks, GPU compute) sit outside the ACID boundary, may execute partially before crashes, and require external idempotency.
 
-## 4. Cancellation Semantics
-
-- **Queued:** API executes an atomic conditional `UPDATE` (`queued -> cancelled`).
-- **Running:** API runs a conditional `UPDATE` setting `cancel_requested = TRUE` and `cancel_requested_at = COALESCE(cancel_requested_at, clock_timestamp())` where `status = 'running'`. If `0` rows match, the API re-reads the row (`404` if missing, retry `queued` cancel if reclaimed, or return terminal state unchanged) and never overwrites a terminal state. Workers abort cooperatively at safe checkpoints and commit `running -> cancelled` under full fencing + lease-validity + `cancel_requested = TRUE` guards (`rowcount == 1` or rollback).
-- **Terminal:** `POST /jobs/{job_id}/cancel` returns **`HTTP 200 OK`** with the current job representation unchanged (idempotent).
-
-## 5. Execution Guarantees & Key Risks
-
-- **Bounded Retries:** Duplicate execution attempts are possible after crashes or retryable failures, retries are bounded by `max_attempts`, and successful completion is not guaranteed.
-- **Scoped Database Effects:** Workers commit `execution_effects` and the fenced, lease-validated `running -> succeeded` update (`cancel_requested = FALSE`, `rowcount == 1` or rollback) in one ACID transaction. Exactly-once committed database effects are scoped strictly to this PostgreSQL transaction, and `UNIQUE(job_id)` enforces at-most-one committed effect per job.
-- **Top Unresolved Risks (Untested):** Synchronous worker heartbeat decoupling during blocking compute, `lease_ttl`/`heartbeat_interval`/`max_attempts` tuning, polling load across `>= 4` workers, DB connection pool sizing, and external non-DB side effects outside the transaction boundary. See [ARCHITECTURE.md](ARCHITECTURE.md) for full SQL and risk analysis.
+### 8. Retry Policy & Terminal States
+Retryable failures requeue while `attempt < max_attempts` unless `cancel_requested = TRUE` (which takes precedence and cancels). Non-retryable failures transition directly to `failed`, taking precedence over cancellation while holding a valid lease. Terminal states (`succeeded`, `failed`, `cancelled`) are final and immutable.
