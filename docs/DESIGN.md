@@ -1,6 +1,6 @@
 # Design Note: Training-Job Queue Service
 
-> **Status:** Implemented & Verified (PostgreSQL 16, FastAPI, 4 Uvicorn processes, independent workers, Alembic migrations; 49 tests passing). Companion specification: [ARCHITECTURE.md](ARCHITECTURE.md).
+> **Status:** Implemented & Verified (PostgreSQL 16, FastAPI, 4 Uvicorn processes, independent workers, Alembic migrations; 77 tests passing). Companion specification: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 

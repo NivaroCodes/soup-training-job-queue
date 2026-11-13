@@ -48,10 +48,19 @@ Defined in [docker-compose.yml](../docker-compose.yml) and [Dockerfile](../Docke
 
 ## 5. Chaos Harness Design
 
-Implemented in [scripts/chaos_harness.py](../scripts/chaos_harness.py):
+Implemented in [scripts/chaos_harness.py](../scripts/chaos_harness.py) and verified by unit tests in [tests/test_chaos_harness.py](../tests/test_chaos_harness.py):
 - **Deterministic Seeding:** Uses `random.Random(seed)` (`seed=42` in Runs A–C) to select duplicate (`15%`), cancellation (`10%`), and `409` conflict-probe (`20`) indices, as well as random `SIGKILL` worker targets.
 - **Concurrent Workload:** Submits unique jobs (`idempotency_key = "<run_id>:job:<idx>"`), concurrent duplicate `POST /jobs`, `409` conflict probes (reused key with tampered payload), and concurrent `POST /jobs/{id}/cancel` requests via `ThreadPoolExecutor(max_workers=32)`.
-- **Fault Injection:** Background thread enumerates running worker containers (`docker compose ps -q worker`), sends `docker kill -s SIGKILL <container_id>` after `--kill-interval`, waits for auto-restart (or runs `docker start`), and logs both events.
+- **Decoupled Chaos Scheduler (AGY-021 / AGY-022 / AGY-024 / AGY-025):** Replaced synchronous kill-and-wait loop with a non-blocking `ChaosScheduler` class. The scheduler fires `docker kill -s SIGKILL` on a strict monotonic timer (`time.monotonic()`), maintains a thread-safe `_recovering_containers` tracking set to prevent re-killing workers already restarting, skips missed ticks without burst execution, and separates kill execution (`_kill_pool`) from container restart recovery (`_recovery_pool`). This separation prevents recovery polling backpressure from delaying actual kill ticks. Structured restart accounting separates actual `docker start` attempts (`restart_attempts`) from total recovery events (`recovery_count`), auto-restarts (`auto_restarts`), manual restarts (`manual_restarts`), failed starts (`failed_starts`), recovery timeouts (`recovery_timeouts`), and shutdown cancellations (`cancelled_by_shutdown`).
+- **Synchronized Active Cancellation Cohort (AGY-021 / AGY-025):** To address the low active-cancellation coverage in Run C (~30 ms jobs finished before cancellation arrived, yielding only 14 cancellations), the harness includes a dedicated `ActiveCancellationCohort`. The cohort submits long-running probe jobs (40 steps of 500 ms = 20s total, key prefix `<run_id>:active_cancel_probe:<idx>`) and enforces a synchronization barrier: all probes must be confirmed `running` before ANY cancellation request is released. If the barrier is satisfied, cancellation requests are dispatched concurrently, terminal `cancelled` states are verified, and 0 execution effects are confirmed. In the main harness, active cancellation probes run concurrently while background SIGKILL chaos is active.
+- **Invariants Verified:** Evaluates 7 formal correctness invariants post-run:
+  1. `no_lost_jobs`: `succeeded + failed + cancelled == total_db_jobs == submitted`
+  2. `at_most_one_execution_effect`: `0 <= effects <= 1` per job
+  3. `no_orphaned_execution_effects`: every effect corresponds to a `succeeded` job
+  4. `no_stuck_running_jobs`: 0 jobs remaining in `running` or `queued` state
+  5. `monotonic_fencing_tokens`: max fencing token >= attempts count
+  6. `terminal_state_stability`: zero changes upon re-polling terminal jobs
+  7. `active_cancellation_integrity` *(AGY-021)*: 100% of probed active cancellation jobs reach terminal `cancelled` with 0 execution effects
 - **Artifact Preservation:** Writes immutable `<run_id>.log` and `<run_id>.json` files in `artifacts/chaos/` without overwriting prior runs, returning non-zero exit code if any invariant fails. Both `.json` and `.log` artifacts are committed to Git. JSON files preserve structured results; paired `.log` files preserve human-readable console output.
 
 ---
@@ -128,7 +137,14 @@ All six invariants were verified directly against PostgreSQL after queue drain i
 
 ## 12. What Surprised Us and What Still Concerns Us
 
-What surprised us most during chaos testing was how subtle harness timing interactions can distort fault-injection goals: configured for a `2.0s` `SIGKILL` interval, the harness actually executed kills only every `~9.1s` because synchronous container restart polling blocked the loop, meaning the system faced less frequent crash trauma than intended. Furthermore, despite firing `1,000` concurrent cancellation requests, the ~30 ms duration of simulated jobs meant almost all jobs finished before cancellation could hit them, yielding only `14` actual cancellations and leaving active cooperative cancellation validation almost entirely dependent on deterministic `pytest` tests rather than chaos-scale churn. What still concerns us for production is the behavior under conditions Docker Compose cannot simulate: unmitigated network partitions between workers and PostgreSQL, query tail latency when the `jobs` table reaches millions of rows (given `GET /jobs` performs an exact `count()`), and external side effects that lack PostgreSQL transaction atomicity.
+What surprised us most during chaos testing was how subtle harness timing interactions can distort fault-injection goals: configured for a `2.0s` `SIGKILL` interval, the harness actually executed kills only every `~9.1s` because synchronous container restart polling blocked the loop, meaning the system faced less frequent crash trauma than intended. Furthermore, despite firing `1,000` concurrent cancellation requests, the ~30 ms duration of simulated jobs meant almost all jobs finished before cancellation could hit them, yielding only `14` actual cancellations and leaving active cooperative cancellation validation almost entirely dependent on deterministic `pytest` tests rather than chaos-scale churn.
+
+*(Resolution Note — AGY-021 / AGY-025):* Both harness limitations were systematically addressed and hardened in `scripts/chaos_harness.py`:
+1. **Cadence Decoupling & Dual-Pool Backpressure Fix:** Replaced the synchronous kill loop with a non-blocking `ChaosScheduler` using monotonic scheduling, a thread-safe `_recovering_containers` tracking set, and separate execution pools (`_kill_pool` for SIGKILL dispatch and `_recovery_pool` for asynchronous container restart polling). This ensures recovery polling never delays scheduled kill execution ticks.
+2. **Synchronized Active Cancellation Cohort:** Implemented `ActiveCancellationCohort` with a deterministic synchronization barrier: submits long-running probe jobs (40 steps of 500 ms = 20s planned duration, key prefix `<run_id>:active_cancel_probe:<idx>`), polls until *every* probe is confirmed `running`, and releases concurrent `POST /cancel` requests only after the barrier is satisfied. In the harness orchestration, active cancellation probes run concurrently while background chaos is active.
+3. **Structured Accounting & Verification:** Corrected start-attempt accounting semantics (`restart_attempts` measures actual manual `docker start` attempts, cleanly separated from auto-restarts, failed starts, recovery timeouts, and shutdown cancellations). Both subsystems are validated via 28 unit tests in `tests/test_chaos_harness.py` (`77` total tests passing in `pytest`). Note that live container re-run of this enhanced harness awaits developer startup of Docker Desktop, as the local Docker daemon remained offline during this pass.
+
+What still concerns us for production is the behavior under conditions Docker Compose cannot simulate: unmitigated network partitions between workers and PostgreSQL, query tail latency when the `jobs` table reaches millions of rows (given `GET /jobs` performs an exact `count()`), and external side effects that lack PostgreSQL transaction atomicity.
 
 ---
 
@@ -166,6 +182,6 @@ docker compose up -d --scale worker=8
 - **Smoke Run (Run A):** [run_20261112_095909_seed42_55d8b3.json](../artifacts/chaos/run_20261112_095909_seed42_55d8b3.json)
 - **Chaos Pilot (Run B):** [run_20261112_100147_seed42_442bd4.json](../artifacts/chaos/run_20261112_100147_seed42_442bd4.json)
 - **Full 10,000-Job Chaos Run (Run C):** [run_20261112_100304_seed42_9b42c4.json](../artifacts/chaos/run_20261112_100304_seed42_9b42c4.json)
-- **Test Suites:** [test_database_models.py](../tests/test_database_models.py), [test_api_jobs.py](../tests/test_api_jobs.py), [test_worker_engine.py](../tests/test_worker_engine.py)
+- **Test Suites:** [test_database_models.py](../tests/test_database_models.py), [test_api_jobs.py](../tests/test_api_jobs.py), [test_worker_engine.py](../tests/test_worker_engine.py), [test_chaos_harness.py](../tests/test_chaos_harness.py)
 
 *(Note on artifact formats: Structured chaos evidence is preserved in tracked `.json` artifacts under `artifacts/chaos/`, with paired human-readable `.log` console outputs. Both formats are committed to Git.)*
