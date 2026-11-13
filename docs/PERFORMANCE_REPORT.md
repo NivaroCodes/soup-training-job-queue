@@ -1,7 +1,7 @@
 # Performance Baseline & 100 RPS Validation Report
 
 > **Verdict:** **`SHIP at 100 RPS`** (verified across `AGY-011`, `AGY-012`, and `AGY-013` evidence reconciliation)
-> **Stage:** `AGY-013` — Sustained Load Evidence Reconciliation (`AGY-012` counts, warm-up accounting, and telemetry windows reconciled against PostgreSQL and raw `.json` artifacts; `.log` files available locally).
+> **Stage:** `AGY-013` — Sustained Load Evidence Reconciliation (`AGY-012` counts, warm-up accounting, and telemetry windows reconciled against PostgreSQL and raw `.json` and `.log` artifacts, both tracked in Git).
 > **Git Revision:** `90758d713c3a906a7cbff0f79e6249f4d072e43a` (+ `AGY-011` optimizations)
 
 ---
@@ -198,4 +198,4 @@ All 19 baseline runs plus optimization and sustained load runs (30 total `.json`
 - List Jobs: `perf_get_list_{25,50,100}rps_*.json`
 - Cancel Job: `perf_post_cancel_{25,50,100}rps_*.json`
 
-*(Note on artifact formats: All primary structured performance metrics and telemetry are preserved in tracked .json artifacts in Git under artifacts/perf/. Accompanying .log files were generated during local test execution as console output summaries and are ignored by .gitignore.)*
+*(Note on artifact formats: Structured performance metrics and telemetry are preserved in tracked `.json` artifacts under `artifacts/perf/`, with paired human-readable `.log` console outputs. Both formats are committed to Git.)*

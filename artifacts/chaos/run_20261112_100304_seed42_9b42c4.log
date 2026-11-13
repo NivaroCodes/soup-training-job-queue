@@ -1,0 +1,51 @@
+[2026-11-12T10:03:04Z] Starting chaos run run_20261112_100304_seed42_9b42c4 (jobs=10000, workers=8, seed=42, no_chaos=False)
+[2026-11-12T10:03:05Z] Observed 8 worker containers: ['d7a067acc4f13d3f78cdbd7bc715452624ddc0764035f882ca143da12121e8b8', '40b0e55e5d5584c3d2449de6cddb54570dfba364a2341781aed55e0d2eeebf80', '3e93af4b6583d4457b058e5c6cdac031cf4c6cef9e9b7af9602d86c13c2abbc3', 'fc7afbaf44c1cfe9ba8db7cb72347731ecb9b84a1f09521064930936f9655edc', '82e3b525c801b2f7b970c58ac0d2614296a2328a61f453366bac6d0e33f320ba', '04683f1378951cf7bcf7f4af095b4b12a7239357e7b0ac1297d629c3d5e179b8', '7e6d646863e10b553309a19d061f921a5d38baa21458fb68e1ab4efb5796872b', '5563b27173288a548fc39fa62ac5d138581d615600ed141323877b27fb0a29c6']
+[2026-11-12T10:03:05Z] Cleaning jobs and execution_effects tables before run (--clean-db).
+[2026-11-12T10:03:05Z] Submitting workload...
+[2026-11-12T10:03:08Z] CHAOS SIGKILL -> 82e3b525c801 (rc=0)
+[2026-11-12T10:03:14Z] CHAOS RESTART -> 82e3b525c801 (restarted=True)
+[2026-11-12T10:03:17Z] Submitted 1000/10000 logical jobs...
+[2026-11-12T10:03:18Z] CHAOS SIGKILL -> fc7afbaf44c1 (rc=0)
+[2026-11-12T10:03:24Z] CHAOS RESTART -> fc7afbaf44c1 (restarted=True)
+[2026-11-12T10:03:27Z] CHAOS SIGKILL -> 40b0e55e5d55 (rc=0)
+[2026-11-12T10:03:30Z] Submitted 2000/10000 logical jobs...
+[2026-11-12T10:03:33Z] CHAOS RESTART -> 40b0e55e5d55 (restarted=True)
+[2026-11-12T10:03:36Z] CHAOS SIGKILL -> 40b0e55e5d55 (rc=0)
+[2026-11-12T10:03:41Z] Submitted 3000/10000 logical jobs...
+[2026-11-12T10:03:42Z] CHAOS RESTART -> 40b0e55e5d55 (restarted=True)
+[2026-11-12T10:03:45Z] CHAOS SIGKILL -> 82e3b525c801 (rc=0)
+[2026-11-12T10:03:51Z] CHAOS RESTART -> 82e3b525c801 (restarted=True)
+[2026-11-12T10:03:53Z] Submitted 4000/10000 logical jobs...
+[2026-11-12T10:03:54Z] CHAOS SIGKILL -> 3e93af4b6583 (rc=0)
+[2026-11-12T10:04:00Z] CHAOS RESTART -> 3e93af4b6583 (restarted=True)
+[2026-11-12T10:04:03Z] CHAOS SIGKILL -> 7e6d646863e1 (rc=0)
+[2026-11-12T10:04:05Z] Submitted 5000/10000 logical jobs...
+[2026-11-12T10:04:09Z] CHAOS RESTART -> 7e6d646863e1 (restarted=True)
+[2026-11-12T10:04:12Z] CHAOS SIGKILL -> 3e93af4b6583 (rc=0)
+[2026-11-12T10:04:17Z] Submitted 6000/10000 logical jobs...
+[2026-11-12T10:04:18Z] CHAOS RESTART -> 3e93af4b6583 (restarted=True)
+[2026-11-12T10:04:22Z] CHAOS SIGKILL -> 7e6d646863e1 (rc=0)
+[2026-11-12T10:04:27Z] CHAOS RESTART -> 7e6d646863e1 (restarted=True)
+[2026-11-12T10:04:30Z] Submitted 7000/10000 logical jobs...
+[2026-11-12T10:04:31Z] CHAOS SIGKILL -> 04683f137895 (rc=0)
+[2026-11-12T10:04:37Z] CHAOS RESTART -> 04683f137895 (restarted=True)
+[2026-11-12T10:04:40Z] CHAOS SIGKILL -> 04683f137895 (rc=0)
+[2026-11-12T10:04:42Z] Submitted 8000/10000 logical jobs...
+[2026-11-12T10:04:46Z] CHAOS RESTART -> 04683f137895 (restarted=True)
+[2026-11-12T10:04:49Z] CHAOS SIGKILL -> 40b0e55e5d55 (rc=0)
+[2026-11-12T10:04:54Z] Submitted 9000/10000 logical jobs...
+[2026-11-12T10:04:55Z] CHAOS RESTART -> 40b0e55e5d55 (restarted=True)
+[2026-11-12T10:04:58Z] CHAOS SIGKILL -> 40b0e55e5d55 (rc=0)
+[2026-11-12T10:05:04Z] CHAOS RESTART -> 40b0e55e5d55 (restarted=True)
+[2026-11-12T10:05:06Z] Submitted 10000/10000 logical jobs...
+[2026-11-12T10:05:06Z] Waiting for all submitted jobs to reach terminal states...
+[2026-11-12T10:05:06Z] Final state counts: {'cancelled': 14, 'succeeded': 9986}, effects=9986
+[2026-11-12T10:05:06Z] Kill events: 13, Restart events: 13
+[2026-11-12T10:05:06Z] INVARIANT [PASS] no_lost_jobs: db_jobs=10000, expected=10000, http_errors=0
+[2026-11-12T10:05:06Z] INVARIANT [PASS] no_duplicate_side_effects: duplicate_effect_jobs=0
+[2026-11-12T10:05:06Z] INVARIANT [PASS] no_stuck_running_or_queued_jobs: running=0, queued=0
+[2026-11-12T10:05:06Z] INVARIANT [PASS] consistent_final_states: succeeded=9986, effects=9986, succeeded_missing_effect=0, non_succeeded_with_effect=0, succeeded_with_cancel=0
+[2026-11-12T10:05:06Z] INVARIANT [PASS] fencing_integrity: fencing_mismatches=0
+[2026-11-12T10:05:06Z] INVARIANT [PASS] idempotency_and_409_conflict: duplicates=1500, mismatches=0, 409_probes=20, 409_failures=0
+[2026-11-12T10:05:06Z] Saved JSON report: artifacts\chaos\run_20261112_100304_seed42_9b42c4.json
+[2026-11-12T10:05:06Z] Saved log output: artifacts\chaos\run_20261112_100304_seed42_9b42c4.log

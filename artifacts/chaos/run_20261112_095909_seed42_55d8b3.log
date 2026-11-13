@@ -1,0 +1,16 @@
+[2026-11-12T09:59:09Z] Starting chaos run run_20261112_095909_seed42_55d8b3 (jobs=100, workers=4, seed=42, no_chaos=True)
+[2026-11-12T09:59:11Z] Observed 4 worker containers: ['b4737fb04780780c97cd6e390d0139fe82c6fcf0cd6d43ad1632f81786ffd8f5', '4cee08fbd759a2bdb4b8e8469bb7815783c4e94f966bfeb9c582969e47f7cfc9', '566d5d6b2da738314b234650524ddbe79a964dfc3f02f4fc14eee6121fc50bdf', 'cbd9321b421ba8520fd1d331f03e36a3af91bef48706a9efb7b6a7987a1547b7']
+[2026-11-12T09:59:11Z] Cleaning jobs and execution_effects tables before run (--clean-db).
+[2026-11-12T09:59:11Z] Submitting workload...
+[2026-11-12T09:59:13Z] Submitted 100/100 logical jobs...
+[2026-11-12T09:59:14Z] Waiting for all submitted jobs to reach terminal states...
+[2026-11-12T09:59:14Z] Final state counts: {'succeeded': 100}, effects=100
+[2026-11-12T09:59:14Z] Kill events: 0, Restart events: 0
+[2026-11-12T09:59:14Z] INVARIANT [PASS] no_lost_jobs: db_jobs=100, expected=100, http_errors=0
+[2026-11-12T09:59:14Z] INVARIANT [PASS] no_duplicate_side_effects: duplicate_effect_jobs=0
+[2026-11-12T09:59:14Z] INVARIANT [PASS] no_stuck_running_or_queued_jobs: running=0, queued=0
+[2026-11-12T09:59:14Z] INVARIANT [PASS] consistent_final_states: succeeded=100, effects=100, succeeded_missing_effect=0, non_succeeded_with_effect=0, succeeded_with_cancel=0
+[2026-11-12T09:59:14Z] INVARIANT [PASS] fencing_integrity: fencing_mismatches=0
+[2026-11-12T09:59:14Z] INVARIANT [PASS] idempotency_and_409_conflict: duplicates=15, mismatches=0, 409_probes=20, 409_failures=0
+[2026-11-12T09:59:14Z] Saved JSON report: artifacts\chaos\run_20261112_095909_seed42_55d8b3.json
+[2026-11-12T09:59:14Z] Saved log output: artifacts\chaos\run_20261112_095909_seed42_55d8b3.log

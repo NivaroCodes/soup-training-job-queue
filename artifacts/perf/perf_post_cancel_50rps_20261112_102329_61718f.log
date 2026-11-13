@@ -1,0 +1,2 @@
+[2026-11-12T10:23:30Z] Starting perf_post_cancel_50rps_20261112_102329_61718f: scenario=post_cancel, target_rps=50.0, duration=8.0s, warmup=2.0s, concurrency=64, seed=42
+[2026-11-12T10:23:50Z] Result perf_post_cancel_50rps_20261112_102329_61718f: achieved_rps=50.05/50.0, p50=10.774ms, p95=14.791ms, p99=18.013ms, max=26.67ms, 2xx=400, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=13 (active=1, locks=0), jobs={'succeeded': 520}, dup_fx=0, inconsistent=0

@@ -525,10 +525,10 @@ Use this template for every future implementation, migration, or testing task:
 
 ### Available Evidence (Observed in Repository & Command Runs)
 - `pyproject.toml` and `uv.lock`: Unmodified; declare Python `>=3.12` and installed dependencies (`alembic`, `fastapi`, `psycopg[binary]`, `pydantic-settings`, `sqlalchemy`, `uvicorn[standard]`, `httpx`, `pytest`).
-- `artifacts/chaos/run_20261112_095909_seed42_55d8b3.json`: 100-job / 4-worker smoke run (`PASS`, 4.697s; accompanying `.log` generated locally).
-- `artifacts/chaos/run_20261112_100147_seed42_442bd4.json`: 500-job / 8-worker chaos pilot (`PASS`, 10.573s, 1 `SIGKILL`, 1 restart; accompanying `.log` generated locally).
-- `artifacts/chaos/run_20261112_100304_seed42_9b42c4.json`: 10,000-job / 8-worker full chaos run (`PASS`, 121.739s, 9,986 succeeded, 14 cancelled, 13 `SIGKILL`s, 13 restarts, 1,500 duplicates, 20 `409` probes; accompanying `.log` generated locally).
-- `artifacts/perf/` & `docs/PERFORMANCE_REPORT.md`: `AGY-010` baseline (`19` runs), `AGY-011` Opt A+B (`8` runs), `AGY-012` sustained 100 RPS runs (`perf_mixed_100rps_20261112_103730_1d7d1d`, `perf_post_unique_100rps_20261112_105450_db4a2b`, `perf_read_heavy_100rps_20261112_110017_9b041c`; `150,000` measured requests, `0` errors, `0` invariant violations; all preserved as tracked `.json` artifacts; local `.log` summaries), and `AGY-013` PostgreSQL reconciliation.
+- `artifacts/chaos/run_20261112_095909_seed42_55d8b3.json`: 100-job / 4-worker smoke run (`PASS`, 4.697s; paired `.log` also tracked in Git).
+- `artifacts/chaos/run_20261112_100147_seed42_442bd4.json`: 500-job / 8-worker chaos pilot (`PASS`, 10.573s, 1 `SIGKILL`, 1 restart; paired `.log` also tracked in Git).
+- `artifacts/chaos/run_20261112_100304_seed42_9b42c4.json`: 10,000-job / 8-worker full chaos run (`PASS`, 121.739s, 9,986 succeeded, 14 cancelled, 13 `SIGKILL`s, 13 restarts, 1,500 duplicates, 20 `409` probes; paired `.log` also tracked in Git).
+- `artifacts/perf/` & `docs/PERFORMANCE_REPORT.md`: `AGY-010` baseline (`19` runs), `AGY-011` Opt A+B (`8` runs), `AGY-012` sustained 100 RPS runs (`perf_mixed_100rps_20261112_103730_1d7d1d`, `perf_post_unique_100rps_20261112_105450_db4a2b`, `perf_read_heavy_100rps_20261112_110017_9b041c`; `150,000` measured requests, `0` errors, `0` invariant violations; all preserved as tracked `.json` and `.log` artifacts), and `AGY-013` PostgreSQL reconciliation.
 - `.venv\Scripts\pytest.exe -v`: `49 passed, 5 warnings` against local PostgreSQL (post-`AGY-011` regression suite, up from `48 passed` in `AGY-007`).
 
 ### Not Yet Executed (No Evidence Available)
@@ -571,7 +571,7 @@ Use this template for every future implementation, migration, or testing task:
 | 17 | Concurrent duplicate POST requests | **VERIFIED** | `test_concurrent_idempotent_requests_same_payload`, Run C (`1,500` duplicates, `0` mismatches) |
 | 18 | Concurrent cancellation requests | **PARTIALLY VERIFIED** | Run C issued `1,000` concurrent cancellation requests, but only `14` actual cancellation transitions occurred (`9,986` succeeded due to ~30 ms job duration); deterministic pytest integration tests verify active cooperative cancellation of running jobs without implying extensive active-cancellation chaos churn |
 | 19 | All required invariants | **VERIFIED** | All 6 invariants `PASS` in Runs A, B, and C `.json` artifacts |
-| 20 | Raw output and number of runs | **VERIFIED** | `3` complete runs preserved as tracked `.json` artifacts in `artifacts/chaos/` (local `.log` console files ignored by `.gitignore`) |
+| 20 | Raw output and number of runs | **VERIFIED** | `3` complete runs preserved as paired tracked `.json` and `.log` artifacts in `artifacts/chaos/` |
 | 21 | Failed-run preservation | **PARTIALLY VERIFIED** | Harness uses unique non-overwriting filenames even on failure (`finally` block), though no failed chaos run is in `artifacts/chaos/`; earlier failed `pytest` runs are recorded in `AI_USAGE.md` |
 | 22 | Silent failure analysis | **VERIFIED** | `docs/CHAOS_REPORT.md` §9 |
 | 23 | Production verdict at 100 RPS | **VERIFIED (`SHIP at 100 RPS`)** | `AGY-011` Opt A+B (`99.97 RPS` `post_unique`, `99.98 RPS` `mixed`), `AGY-012` sustained 100 RPS (`15m` mixed, `5m` unique POST, `5m` read-heavy; `0` errors, `0` invariant violations), and `AGY-013` reconciliation (`docs/PERFORMANCE_REPORT.md`) |

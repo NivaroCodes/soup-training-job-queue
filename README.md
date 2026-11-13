@@ -84,7 +84,7 @@ Latest verified regression result: **`49 passed, 5 warnings`** against PostgreSQ
 - [Performance Baseline & 100 RPS Validation Report](docs/PERFORMANCE_REPORT.md) — Baseline, Optimization A/B results, and 25 minutes (`150,000` requests) of sustained 100 RPS validation.
 - [AI Usage Record](docs/AI_USAGE.md) — Transparent stage-by-stage AI usage log, failed attempts, reliability assessment, and requirement coverage matrix.
 
-*(Note on raw artifacts: All primary structured benchmark and chaos results are committed to Git as `.json` files in `artifacts/chaos/` and `artifacts/perf/`. Accompanying human-readable `.log` console outputs are produced during local runs and are ignored by `.gitignore`.)*
+*(Note on raw artifacts: Structured benchmark and chaos results are preserved as `.json` files, with paired human-readable `.log` console outputs, both committed to Git under `artifacts/chaos/` and `artifacts/perf/`.)*
 
 ---
 

@@ -1,0 +1,18 @@
+[2026-11-12T10:37:30Z] Starting perf_mixed_100rps_20261112_103730_1d7d1d: scenario=mixed, target_rps=100.0, duration=900.0s, warmup=120.0s, concurrency=64, seed=42
+[2026-11-12T10:38:33Z] [W1] rps=0.0, p50=0.0ms, p95=0.0ms, p99=0.0ms, err=0, pg={'total_conns': 16, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 2412, 'running': 4}
+[2026-11-12T10:39:36Z] [W2] rps=3.28, p50=11.093ms, p95=18.775ms, p99=21.104ms, err=0, pg={'total_conns': 18, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 4923, 'queued': 2, 'running': 1}
+[2026-11-12T10:40:38Z] [W3] rps=103.8, p50=11.596ms, p95=25.167ms, p99=39.269ms, err=0, pg={'total_conns': 18, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 7406, 'queued': 2}
+[2026-11-12T10:41:40Z] [W4] rps=103.93, p50=13.318ms, p95=29.806ms, p99=42.488ms, err=0, pg={'total_conns': 19, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 9925, 'queued': 1, 'running': 1}
+[2026-11-12T10:42:43Z] [W5] rps=103.68, p50=12.58ms, p95=28.167ms, p99=42.431ms, err=0, pg={'total_conns': 25, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 12397, 'queued': 4}
+[2026-11-12T10:43:45Z] [W6] rps=103.83, p50=15.799ms, p95=33.71ms, p99=44.712ms, err=0, pg={'total_conns': 25, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 14887, 'running': 2}
+[2026-11-12T10:44:47Z] [W7] rps=103.9, p50=15.878ms, p95=33.43ms, p99=44.906ms, err=0, pg={'total_conns': 26, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 17391, 'queued': 1, 'running': 2}
+[2026-11-12T10:45:49Z] [W8] rps=103.73, p50=16.07ms, p95=34.303ms, p99=57.972ms, err=0, pg={'total_conns': 26, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 19912, 'queued': 2}
+[2026-11-12T10:46:52Z] [W9] rps=103.82, p50=16.878ms, p95=34.705ms, p99=44.978ms, err=0, pg={'total_conns': 26, 'active_conns': 1, 'lock_waits': 0}, jobs={'succeeded': 22394, 'queued': 2}
+[2026-11-12T10:47:54Z] [W10] rps=103.85, p50=16.633ms, p95=36.217ms, p99=61.119ms, err=0, pg={'total_conns': 26, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 24855, 'queued': 3}
+[2026-11-12T10:48:56Z] [W11] rps=103.83, p50=16.304ms, p95=35.268ms, p99=47.683ms, err=0, pg={'total_conns': 26, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 27329, 'queued': 2}
+[2026-11-12T10:49:58Z] [W12] rps=103.8, p50=16.15ms, p95=34.521ms, p99=46.31ms, err=0, pg={'total_conns': 26, 'active_conns': 1, 'lock_waits': 0}, jobs={'succeeded': 29840, 'queued': 2, 'running': 2}
+[2026-11-12T10:51:01Z] [W13] rps=103.52, p50=16.738ms, p95=35.994ms, p99=55.32ms, err=0, pg={'total_conns': 26, 'active_conns': 1, 'lock_waits': 0}, jobs={'succeeded': 32308, 'queued': 1, 'running': 1}
+[2026-11-12T10:52:03Z] [W14] rps=103.82, p50=16.459ms, p95=33.771ms, p99=46.848ms, err=0, pg={'total_conns': 26, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 34765, 'queued': 2, 'running': 1}
+[2026-11-12T10:53:05Z] [W15] rps=103.77, p50=15.527ms, p95=34.78ms, p99=49.104ms, err=0, pg={'total_conns': 26, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 37305, 'running': 1}
+[2026-11-12T10:54:08Z] [W16] rps=103.82, p50=15.96ms, p95=34.909ms, p99=56.62ms, err=0, pg={'total_conns': 27, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 39772, 'running': 4}
+[2026-11-12T10:54:35Z] Result perf_mixed_100rps_20261112_103730_1d7d1d: achieved_rps=99.97/100.0, p50=15.384ms, p95=33.819ms, p99=47.815ms, max=416.69ms, 2xx=90000, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=28 (active=4, locks=0), unique_sub=35950/db=35950, jobs={'succeeded': 40813}, dup_fx=0, inconsistent=0

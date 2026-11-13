@@ -1,0 +1,7 @@
+[2026-11-12T11:00:17Z] Starting perf_read_heavy_100rps_20261112_110017_9b041c: scenario=read_heavy, target_rps=100.0, duration=300.0s, warmup=10.0s, concurrency=64, seed=42
+[2026-11-12T11:01:21Z] [W1] rps=81.9, p50=23.619ms, p95=46.605ms, p99=65.681ms, err=0, pg={'total_conns': 27, 'active_conns': 0, 'lock_waits': 0}, jobs={'succeeded': 50}
+[2026-11-12T11:02:23Z] [W2] rps=103.82, p50=23.655ms, p95=46.899ms, p99=70.773ms, err=0, pg={'total_conns': 27, 'active_conns': 1, 'lock_waits': 0}, jobs={'succeeded': 50}
+[2026-11-12T11:03:26Z] [W3] rps=103.78, p50=23.736ms, p95=48.019ms, p99=69.827ms, err=0, pg={'total_conns': 27, 'active_conns': 1, 'lock_waits': 0}, jobs={'succeeded': 50}
+[2026-11-12T11:04:27Z] [W4] rps=103.72, p50=22.997ms, p95=46.175ms, p99=66.532ms, err=0, pg={'total_conns': 27, 'active_conns': 1, 'lock_waits': 0}, jobs={'succeeded': 50}
+[2026-11-12T11:05:29Z] [W5] rps=102.38, p50=23.205ms, p95=43.087ms, p99=64.526ms, err=0, pg={'total_conns': 27, 'active_conns': 1, 'lock_waits': 0}, jobs={'succeeded': 50}
+[2026-11-12T11:05:32Z] Result perf_read_heavy_100rps_20261112_110017_9b041c: achieved_rps=99.97/100.0, p50=23.435ms, p95=46.121ms, p99=67.45ms, max=266.012ms, 2xx=30000, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=28 (active=5, locks=0), unique_sub=0/db=0, jobs={'succeeded': 50}, dup_fx=0, inconsistent=0

@@ -1,0 +1,18 @@
+[2026-11-12T10:01:47Z] Starting chaos run run_20261112_100147_seed42_442bd4 (jobs=500, workers=8, seed=42, no_chaos=False)
+[2026-11-12T10:01:47Z] Observed 8 worker containers: ['d7a067acc4f13d3f78cdbd7bc715452624ddc0764035f882ca143da12121e8b8', '40b0e55e5d5584c3d2449de6cddb54570dfba364a2341781aed55e0d2eeebf80', '3e93af4b6583d4457b058e5c6cdac031cf4c6cef9e9b7af9602d86c13c2abbc3', 'fc7afbaf44c1cfe9ba8db7cb72347731ecb9b84a1f09521064930936f9655edc', '82e3b525c801b2f7b970c58ac0d2614296a2328a61f453366bac6d0e33f320ba', '04683f1378951cf7bcf7f4af095b4b12a7239357e7b0ac1297d629c3d5e179b8', '7e6d646863e10b553309a19d061f921a5d38baa21458fb68e1ab4efb5796872b', '5563b27173288a548fc39fa62ac5d138581d615600ed141323877b27fb0a29c6']
+[2026-11-12T10:01:47Z] Cleaning jobs and execution_effects tables before run (--clean-db).
+[2026-11-12T10:01:48Z] Submitting workload...
+[2026-11-12T10:01:51Z] CHAOS SIGKILL -> fc7afbaf44c1 (rc=0)
+[2026-11-12T10:01:54Z] Submitted 500/500 logical jobs...
+[2026-11-12T10:01:54Z] Waiting for all submitted jobs to reach terminal states...
+[2026-11-12T10:01:57Z] CHAOS RESTART -> fc7afbaf44c1 (restarted=True)
+[2026-11-12T10:01:57Z] Final state counts: {'succeeded': 500}, effects=500
+[2026-11-12T10:01:57Z] Kill events: 1, Restart events: 1
+[2026-11-12T10:01:57Z] INVARIANT [PASS] no_lost_jobs: db_jobs=500, expected=500, http_errors=0
+[2026-11-12T10:01:57Z] INVARIANT [PASS] no_duplicate_side_effects: duplicate_effect_jobs=0
+[2026-11-12T10:01:57Z] INVARIANT [PASS] no_stuck_running_or_queued_jobs: running=0, queued=0
+[2026-11-12T10:01:57Z] INVARIANT [PASS] consistent_final_states: succeeded=500, effects=500, succeeded_missing_effect=0, non_succeeded_with_effect=0, succeeded_with_cancel=0
+[2026-11-12T10:01:57Z] INVARIANT [PASS] fencing_integrity: fencing_mismatches=0
+[2026-11-12T10:01:57Z] INVARIANT [PASS] idempotency_and_409_conflict: duplicates=75, mismatches=0, 409_probes=20, 409_failures=0
+[2026-11-12T10:01:57Z] Saved JSON report: artifacts\chaos\run_20261112_100147_seed42_442bd4.json
+[2026-11-12T10:01:57Z] Saved log output: artifacts\chaos\run_20261112_100147_seed42_442bd4.log

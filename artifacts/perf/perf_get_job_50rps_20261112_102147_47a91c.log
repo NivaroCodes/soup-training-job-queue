@@ -1,0 +1,2 @@
+[2026-11-12T10:21:47Z] Starting perf_get_job_50rps_20261112_102147_47a91c: scenario=get_job, target_rps=50.0, duration=8.0s, warmup=2.0s, concurrency=64, seed=42
+[2026-11-12T10:22:01Z] Result perf_get_job_50rps_20261112_102147_47a91c: achieved_rps=50.06/50.0, p50=9.199ms, p95=12.203ms, p99=13.325ms, max=16.008ms, 2xx=400, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=13 (active=1, locks=0), jobs={'succeeded': 50}, dup_fx=0, inconsistent=0

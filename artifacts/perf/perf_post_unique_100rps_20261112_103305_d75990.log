@@ -1,0 +1,2 @@
+[2026-11-12T10:33:05Z] Starting perf_post_unique_100rps_20261112_103305_d75990: scenario=post_unique, target_rps=100.0, duration=8.0s, warmup=2.0s, concurrency=64, seed=42
+[2026-11-12T10:33:18Z] Result perf_post_unique_100rps_20261112_103305_d75990: achieved_rps=99.97/100.0, p50=10.689ms, p95=16.897ms, p99=21.363ms, max=31.661ms, 2xx=800, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=15 (active=2, locks=0), jobs={'succeeded': 1000}, dup_fx=0, inconsistent=0

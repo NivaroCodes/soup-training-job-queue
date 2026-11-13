@@ -52,7 +52,7 @@ Implemented in [scripts/chaos_harness.py](../scripts/chaos_harness.py):
 - **Deterministic Seeding:** Uses `random.Random(seed)` (`seed=42` in Runs A–C) to select duplicate (`15%`), cancellation (`10%`), and `409` conflict-probe (`20`) indices, as well as random `SIGKILL` worker targets.
 - **Concurrent Workload:** Submits unique jobs (`idempotency_key = "<run_id>:job:<idx>"`), concurrent duplicate `POST /jobs`, `409` conflict probes (reused key with tampered payload), and concurrent `POST /jobs/{id}/cancel` requests via `ThreadPoolExecutor(max_workers=32)`.
 - **Fault Injection:** Background thread enumerates running worker containers (`docker compose ps -q worker`), sends `docker kill -s SIGKILL <container_id>` after `--kill-interval`, waits for auto-restart (or runs `docker start`), and logs both events.
-- **Artifact Preservation:** Writes immutable `<run_id>.log` and `<run_id>.json` files in `artifacts/chaos/` without overwriting prior runs, returning non-zero exit code if any invariant fails. Primary structured evidence is committed to Git via `.json` artifacts; `.log` files are generated locally as human-readable console outputs and are ignored by `.gitignore` (`*.log`).
+- **Artifact Preservation:** Writes immutable `<run_id>.log` and `<run_id>.json` files in `artifacts/chaos/` without overwriting prior runs, returning non-zero exit code if any invariant fails. Both `.json` and `.log` artifacts are committed to Git. JSON files preserve structured results; paired `.log` files preserve human-readable console output.
 
 ---
 
@@ -84,12 +84,12 @@ All six invariants were verified directly against PostgreSQL after queue drain i
 
 | Invariant | What It Checks | How It Is Checked (PostgreSQL Query / Harness Check) | Run A | Run B | Run C | Evidence Source |
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| `no_lost_jobs` | Every submitted logical job has exactly one DB row and zero HTTP submission errors. | `COUNT(*)` on `jobs` for `run_id` prefix == `--jobs` AND `len(http_errors) == 0`. | PASS (`100/100`) | PASS (`500/500`) | PASS (`10000/10000`) | Run A/B/C `.json` (tracked; `.log` local) |
-| `no_duplicate_side_effects` | No job has more than one committed `execution_effects` row. | `SELECT e.job_id FROM execution_effects e JOIN jobs j ... GROUP BY e.job_id HAVING COUNT(*) > 1` == `0` (backed by `uq_execution_effects_job_id`). | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` (tracked; `.log` local) |
-| `no_stuck_running_or_queued_jobs` | All jobs drained to terminal states after recovery window. | `running == 0` AND `queued == 0` for `run_id` prefix after drain. | PASS (`0/0`) | PASS (`0/0`) | PASS (`0/0`) | Run A/B/C `.json` (tracked; `.log` local) |
-| `consistent_final_states` | `succeeded` jobs have 1 effect and `cancel_requested = FALSE`; non-succeeded jobs have 0 effects. | `LEFT JOIN` / `JOIN` queries checking `succeeded_missing_effect == 0`, `non_succeeded_with_effect == 0`, `succeeded_with_cancel == 0`, `effects == succeeded`. | PASS (`100=100`) | PASS (`500=500`) | PASS (`9986=9986`) | Run A/B/C `.json` (tracked; `.log` local) |
-| `fencing_integrity` | No `execution_effects` row carries a stale or invalid `fencing_token`. | `execution_effects.fencing_token != jobs.fencing_token OR execution_effects.fencing_token < 1` count == `0`. | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` (tracked; `.log` local) |
-| `idempotency_and_409_conflict` | Repeated identical POSTs return the original job ID; mismatched payload reuses return `HTTP 409`. | Client-side verification of `dup_resp.id == original_id` and `conflict_resp.status_code == 409` (`20` probes/run). | PASS (`15` dup, `20` 409) | PASS (`75` dup, `20` 409) | PASS (`1500` dup, `20` 409) | Run A/B/C `.json` (tracked; `.log` local) |
+| `no_lost_jobs` | Every submitted logical job has exactly one DB row and zero HTTP submission errors. | `COUNT(*)` on `jobs` for `run_id` prefix == `--jobs` AND `len(http_errors) == 0`. | PASS (`100/100`) | PASS (`500/500`) | PASS (`10000/10000`) | Run A/B/C `.json` + `.log` (both tracked) |
+| `no_duplicate_side_effects` | No job has more than one committed `execution_effects` row. | `SELECT e.job_id FROM execution_effects e JOIN jobs j ... GROUP BY e.job_id HAVING COUNT(*) > 1` == `0` (backed by `uq_execution_effects_job_id`). | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` + `.log` (both tracked) |
+| `no_stuck_running_or_queued_jobs` | All jobs drained to terminal states after recovery window. | `running == 0` AND `queued == 0` for `run_id` prefix after drain. | PASS (`0/0`) | PASS (`0/0`) | PASS (`0/0`) | Run A/B/C `.json` + `.log` (both tracked) |
+| `consistent_final_states` | `succeeded` jobs have 1 effect and `cancel_requested = FALSE`; non-succeeded jobs have 0 effects. | `LEFT JOIN` / `JOIN` queries checking `succeeded_missing_effect == 0`, `non_succeeded_with_effect == 0`, `succeeded_with_cancel == 0`, `effects == succeeded`. | PASS (`100=100`) | PASS (`500=500`) | PASS (`9986=9986`) | Run A/B/C `.json` + `.log` (both tracked) |
+| `fencing_integrity` | No `execution_effects` row carries a stale or invalid `fencing_token`. | `execution_effects.fencing_token != jobs.fencing_token OR execution_effects.fencing_token < 1` count == `0`. | PASS (`0`) | PASS (`0`) | PASS (`0`) | Run A/B/C `.json` + `.log` (both tracked) |
+| `idempotency_and_409_conflict` | Repeated identical POSTs return the original job ID; mismatched payload reuses return `HTTP 409`. | Client-side verification of `dup_resp.id == original_id` and `conflict_resp.status_code == 409` (`20` probes/run). | PASS (`15` dup, `20` 409) | PASS (`75` dup, `20` 409) | PASS (`1500` dup, `20` 409) | Run A/B/C `.json` + `.log` (both tracked) |
 
 ---
 
@@ -168,4 +168,4 @@ docker compose up -d --scale worker=8
 - **Full 10,000-Job Chaos Run (Run C):** [run_20261112_100304_seed42_9b42c4.json](../artifacts/chaos/run_20261112_100304_seed42_9b42c4.json)
 - **Test Suites:** [test_database_models.py](../tests/test_database_models.py), [test_api_jobs.py](../tests/test_api_jobs.py), [test_worker_engine.py](../tests/test_worker_engine.py)
 
-*(Note on artifact formats: All primary structured evidence is preserved as tracked .json artifacts in Git under artifacts/chaos/. Accompanying .log files were generated during local test execution as console output summaries and are ignored by .gitignore.)*
+*(Note on artifact formats: Structured chaos evidence is preserved in tracked `.json` artifacts under `artifacts/chaos/`, with paired human-readable `.log` console outputs. Both formats are committed to Git.)*

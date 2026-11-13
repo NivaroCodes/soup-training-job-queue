@@ -1,0 +1,2 @@
+[2026-11-12T10:33:19Z] Starting perf_mixed_100rps_20261112_103319_967f6d: scenario=mixed, target_rps=100.0, duration=15.0s, warmup=3.0s, concurrency=64, seed=42
+[2026-11-12T10:33:40Z] Result perf_mixed_100rps_20261112_103319_967f6d: achieved_rps=99.98/100.0, p50=11.162ms, p95=18.498ms, p99=23.349ms, max=43.094ms, 2xx=1500, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=15 (active=2, locks=0), jobs={'succeeded': 744}, dup_fx=0, inconsistent=0

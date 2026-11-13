@@ -1,0 +1,2 @@
+[2026-11-12T10:32:51Z] Starting perf_post_unique_50rps_20261112_103251_6b5a01: scenario=post_unique, target_rps=50.0, duration=8.0s, warmup=2.0s, concurrency=64, seed=42
+[2026-11-12T10:33:04Z] Result perf_post_unique_50rps_20261112_103251_6b5a01: achieved_rps=50.05/50.0, p50=11.213ms, p95=15.502ms, p99=22.714ms, max=33.103ms, 2xx=400, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=13 (active=2, locks=0), jobs={'succeeded': 500}, dup_fx=0, inconsistent=0

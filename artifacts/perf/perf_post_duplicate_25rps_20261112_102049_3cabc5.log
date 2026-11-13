@@ -1,0 +1,2 @@
+[2026-11-12T10:20:49Z] Starting perf_post_duplicate_25rps_20261112_102049_3cabc5: scenario=post_duplicate, target_rps=25.0, duration=8.0s, warmup=2.0s, concurrency=64, seed=42
+[2026-11-12T10:21:03Z] Result perf_post_duplicate_25rps_20261112_102049_3cabc5: achieved_rps=25.08/25.0, p50=9.919ms, p95=13.16ms, p99=14.91ms, max=15.092ms, 2xx=200, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=13 (active=1, locks=0), jobs={'succeeded': 50}, dup_fx=0, inconsistent=0

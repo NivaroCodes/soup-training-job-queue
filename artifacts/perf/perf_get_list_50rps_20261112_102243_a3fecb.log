@@ -1,0 +1,2 @@
+[2026-11-12T10:22:44Z] Starting perf_get_list_50rps_20261112_102243_a3fecb: scenario=get_list, target_rps=50.0, duration=8.0s, warmup=2.0s, concurrency=64, seed=42
+[2026-11-12T10:22:56Z] Result perf_get_list_50rps_20261112_102243_a3fecb: achieved_rps=50.02/50.0, p50=15.147ms, p95=21.124ms, p99=36.062ms, max=71.249ms, 2xx=400, 4xx=0, 5xx=0, conn_err=0, timeouts=0, pg_max_conns=13 (active=1, locks=0), jobs={}, dup_fx=0, inconsistent=0
